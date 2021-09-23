@@ -27,6 +27,14 @@ struct Document {
 }
 
 impl Document {
+    fn empty() -> Document {
+        Document {
+            counter: 0,
+            nodes: vec![],
+            store: vec![],
+        }
+    }
+
     fn new_element(
         &mut self,
         parent: ElementId,
@@ -48,21 +56,24 @@ impl Document {
         self.counter
     }
 
-    fn get_element(&self, id: ElementId) -> Option<&Element> {
+    pub fn get_element(&self, id: ElementId) -> Option<&Element> {
         self.store.get(id)
     }
 
-    fn get_mut_element(&mut self, id: ElementId) -> Option<&mut Element> {
+    pub fn get_mut_element(&mut self, id: ElementId) -> Option<&mut Element> {
         self.store.get_mut(id)
     }
 
-    fn build(&mut self, xml: &str) -> Result<Vec<Node>> {
-        let mut reader = Reader::from_str(xml);
-        reader.trim_text(true);
+    pub fn from_str(str: &str) -> Result<Document> {
+        let mut document = Document::empty();
+        let reader = Reader::from_str(str);
+        document.build(reader)?;
+        Ok(document)
+    }
 
+    fn build<B: std::io::BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         let mut count = 0;
         let mut buf = Vec::new();
-        let mut root_nodes = Vec::new();
         let mut element_stack: Vec<ElementId> = Vec::new();
 
         loop {
@@ -106,7 +117,7 @@ impl Document {
                     let node = Node::Element(element);
                     match element_stack.last() {
                         Some(&id) => self.get_mut_element(id).unwrap().children.push(node),
-                        None => root_nodes.push(node),
+                        None => self.nodes.push(node),
                     };
                     element_stack.push(element);
                 }
@@ -117,10 +128,10 @@ impl Document {
                     let node = Node::Text(e.unescape_and_decode(&reader)?);
                     match element_stack.last() {
                         Some(&id) => self.get_mut_element(id).unwrap().children.push(node),
-                        None => root_nodes.push(node),
+                        None => self.nodes.push(node),
                     }
                 }
-                Ok(Event::Eof) => return Ok(root_nodes),
+                Ok(Event::Eof) => return Ok(()),
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
                 // TODO!
                 _ => (), // Unimplemented
