@@ -8,6 +8,7 @@ use std::collections::HashMap;
 type ElementId = usize;
 enum Node {
     Element(ElementId),
+    Text(String),
 }
 
 struct Element {
@@ -60,7 +61,6 @@ impl Document {
         reader.trim_text(true);
 
         let mut count = 0;
-        let mut txt = Vec::new();
         let mut buf = Vec::new();
         let mut root_nodes = Vec::new();
         let mut element_stack: Vec<ElementId> = Vec::new();
@@ -113,11 +113,16 @@ impl Document {
                 Ok(Event::End(ref ev)) => {
                     element_stack.pop();
                 }
-                // TODO!
-                // unescape and decode the text event using the reader encoding
-                Ok(Event::Text(e)) => txt.push(e.unescape_and_decode(&reader).unwrap()),
+                Ok(Event::Text(e)) => {
+                    let node = Node::Text(e.unescape_and_decode(&reader)?);
+                    match element_stack.last() {
+                        Some(&id) => self.get_mut_element(id).unwrap().children.push(node),
+                        None => root_nodes.push(node),
+                    }
+                }
                 Ok(Event::Eof) => return Ok(root_nodes),
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                // TODO!
                 _ => (), // Unimplemented
             }
         }
