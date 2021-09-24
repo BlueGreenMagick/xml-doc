@@ -5,24 +5,28 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::HashMap;
 
-type ElementId = usize;
-enum Node {
+pub type ElementId = usize;
+
+#[derive(Debug)]
+pub enum Node {
     Element(ElementId),
     Text(String),
 }
 
-struct Element {
-    prefix: Option<String>,
-    name: String,
-    attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
-    namespaces: HashMap<String, String>, // local namespace newly defined in attributes
-    parent: ElementId,
-    children: Vec<Node>,
+#[derive(Debug)]
+pub struct Element {
+    pub prefix: Option<String>,
+    pub name: String,
+    pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
+    pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
+    pub parent: ElementId,
+    pub children: Vec<Node>,
 }
 
-struct Document {
+#[derive(Debug)]
+pub struct Document {
     counter: ElementId, // == self.store.len()
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
     store: Vec<Element>,
 }
 
