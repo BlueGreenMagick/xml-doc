@@ -5,8 +5,6 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::HashMap;
 
-pub type ElementId = usize;
-
 #[cfg(debug_assertions)]
 macro_rules! debug {
     ($x:expr) => {
@@ -21,47 +19,89 @@ macro_rules! debug {
     };
 }
 
+pub type ElementId = usize;
+
 #[derive(Debug)]
 pub enum Node {
     Element(ElementId),
     Text(String),
 }
 
+impl Node {
+    fn as_element(&self) -> Option<ElementId> {
+        match self {
+            Self::Element(id) => Some(*id),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Element {
+    id: ElementId,
     pub prefix: Option<String>,
     pub name: String,
     pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
-    pub parent: ElementId,
+    parent: Option<ElementId>,
     pub children: Vec<Node>,
+}
+
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+    fn ne(&self, other: &Self) -> bool {
+        self.id != other.id
+    }
+}
+
+impl Element {
+    pub fn get_parent(&self) -> Option<ElementId> {
+        self.parent
+    }
+
+    pub fn children_element(&self) -> Vec<ElementId> {
+        self.children
+            .iter()
+            .filter_map(|node| {
+                if let Node::Element(elemid) = node {
+                    Some(*elemid)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug)]
 pub struct Document {
     counter: ElementId, // == self.store.len()
-    pub nodes: Vec<Node>,
     store: Vec<Element>,
 }
 
 impl Document {
     fn empty() -> Document {
-        Document {
+        let mut doc = Document {
             counter: 0,
-            nodes: vec![],
             store: vec![],
-        }
+        };
+        // create root element
+        doc.new_element(None, None, String::new(), HashMap::new(), HashMap::new());
+        doc
     }
 
     fn new_element(
         &mut self,
-        parent: ElementId,
+        parent: Option<ElementId>,
         prefix: Option<String>,
         name: String,
         attributes: HashMap<String, String>,
         namespaces: HashMap<String, String>,
     ) -> ElementId {
         let elem = Element {
+            id: self.counter,
             prefix,
             name,
             attributes,
@@ -74,12 +114,53 @@ impl Document {
         self.counter - 1
     }
 
-    pub fn get_element(&self, id: ElementId) -> Option<&Element> {
-        self.store.get(id)
+    pub fn has_element(&self, id: ElementId) -> bool {
+        self.counter > id
     }
 
-    pub fn get_mut_element(&mut self, id: ElementId) -> Option<&mut Element> {
-        self.store.get_mut(id)
+    pub fn get_element(&self, id: ElementId) -> Result<&Element> {
+        self.store.get(id).ok_or(Error::ElementNotExist(id))
+    }
+
+    pub fn get_mut_element(&mut self, id: ElementId) -> Result<&mut Element> {
+        self.store.get_mut(id).ok_or(Error::ElementNotExist(id))
+    }
+
+    pub fn get_root(&self) -> &Element {
+        self.store.get(0).expect("Root element is gone!")
+    }
+
+    pub fn get_mut_root(&mut self) -> &mut Element {
+        self.store.get_mut(0).expect("Root element is gone!")
+    }
+
+    pub fn set_parent(&mut self, id: ElementId, new_parentid: ElementId) -> Result<()> {
+        if id == 0 {
+            return Err(Error::RootCannotMove);
+        }
+        if !self.has_element(new_parentid) {
+            return Err(Error::ElementNotExist(new_parentid));
+        }
+        let elem = self.get_mut_element(id)?;
+        elem.parent = Some(id); // All elementid references in Document are valid.
+
+        if let Some(parentid) = elem.get_parent() {
+            let parent_children = &mut self
+                .get_mut_element(parentid)
+                .expect("Document is inconsistant: Parent element doesn't exist.")
+                .children;
+            parent_children.remove(
+                parent_children
+                    .iter()
+                    .filter_map(|node| node.as_element())
+                    .position(|x| x == id)
+                    .expect("Element not found in children"),
+            );
+        }
+
+        let new_parent_elem = self.get_mut_element(new_parentid)?;
+        new_parent_elem.children.push(Node::Element(id));
+        Ok(())
     }
 
     pub fn from_str(str: &str) -> Result<Document> {
@@ -94,7 +175,7 @@ impl Document {
         reader.trim_text(true);
 
         let mut buf = Vec::new();
-        let mut element_stack: Vec<ElementId> = Vec::new();
+        let mut element_stack: Vec<ElementId> = vec![0]; // root element in element_stack
 
         loop {
             let ev = reader.read_event(&mut buf);
@@ -131,16 +212,12 @@ impl Document {
                             _ => true,
                         })
                         .collect::<Result<HashMap<String, String>>>()?;
-                    let parent = match element_stack.last() {
-                        Some(&id) => id,
-                        None => ElementId::MAX,
-                    };
+                    let parent = element_stack.last().copied();
                     let element = self.new_element(parent, prefix, name, attributes, namespaces);
                     let node = Node::Element(element);
-                    match element_stack.last() {
-                        Some(&id) => self.get_mut_element(id).unwrap().children.push(node),
-                        None => self.nodes.push(node),
-                    };
+                    //TODO: make sure unwrap isn't called.
+                    let &id = element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
@@ -148,10 +225,8 @@ impl Document {
                 }
                 Ok(Event::Text(e)) => {
                     let node = Node::Text(e.unescape_and_decode(&reader)?);
-                    match element_stack.last() {
-                        Some(&id) => self.get_mut_element(id).unwrap().children.push(node),
-                        None => self.nodes.push(node),
-                    }
+                    let &id = element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
                 }
                 Ok(Event::Eof) => return Ok(()),
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),

@@ -5,9 +5,10 @@ use std::path::Path;
 fn to_yaml(document: &Document) -> String {
     let mut buf = String::new();
     let mut depth: usize = 0;
-    write_line("Document:", depth, &mut buf);
+    write_line("Root:", depth, &mut buf);
     depth += 1;
-    render_nodes(document, &document.nodes, depth, &mut buf);
+    let root_node = document.get_element(0).unwrap();
+    render_nodes(document, &root_node.children, depth, &mut buf);
     buf
 }
 
@@ -40,7 +41,7 @@ fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut Str
 
 fn write_line(text: &str, depth: usize, buf: &mut String) {
     let indent = " ".repeat(depth * 2);
-    writeln!(buf, "{}{}", indent, text);
+    writeln!(buf, "{}{}", indent, text).unwrap();
 }
 
 fn test(file_name: &str) {
