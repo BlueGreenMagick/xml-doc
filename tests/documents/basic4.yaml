@@ -1,0 +1,11 @@
+Root:
+  - Element:
+      name: elem
+      attributes:
+        id: "abc"
+      children:
+        - Element:
+            name: elem2
+            attributes:
+              attr1: "1"
+              attr2: "2"

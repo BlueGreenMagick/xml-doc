@@ -1,4 +1,5 @@
 use quick_xml_tree::{Document, Element, ElementId, Node};
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 use std::path::Path;
@@ -41,11 +42,34 @@ fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut Str
     }
     let name = &elem.name;
     write_line(&format!("name: {}", name), depth, buf);
+
+    let attrs = &elem.attributes;
+    if attrs.len() > 0 {
+        write_line("attributes:", depth, buf);
+        write_hashmap_alphabetical(attrs, depth, buf);
+    }
+
+    let namespaces = &elem.namespaces;
+    if namespaces.len() > 0 {
+        write_line("namespaces:", depth, buf);
+        write_hashmap_alphabetical(namespaces, depth, buf);
+    }
     let children = &elem.children;
     if children.len() > 0 {
         write_line("children:", depth, buf);
         depth += 1;
         render_nodes(doc, children, depth, buf);
+    }
+}
+
+fn write_hashmap_alphabetical(map: &HashMap<String, String>, depth: usize, buf: &mut String) {
+    let mut entries = Vec::new();
+    for (key, val) in map.iter() {
+        entries.push((key.clone(), val.clone()))
+    }
+    entries.sort_by_cached_key(|x| x.0.clone());
+    for entry in entries {
+        write_line(&format!("{}: \"{}\"", entry.0, entry.1), depth + 1, buf);
     }
 }
 
@@ -72,3 +96,7 @@ macro_rules! test {
     };
 }
 
+test!(basic1);
+test!(basic2);
+test!(basic3);
+test!(basic4);
