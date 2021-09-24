@@ -82,11 +82,17 @@ fn test(file_name: &str) {
     let path = Path::new("tests/documents").join(file_name);
     let yaml_file = path.with_extension("yaml");
     let xml_file = path.with_extension("xml");
-    let expected = std::fs::read_to_string(&yaml_file).unwrap();
+    let expected: String = std::fs::read_to_string(&yaml_file)
+        .unwrap()
+        .lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<&str>>()
+        .join("\n");
     let xml_raw_str = std::fs::read_to_string(&xml_file).unwrap();
     let document = Document::from_str(&xml_raw_str).unwrap();
     assert_eq!(TStr(&to_yaml(&document).trim()), TStr(expected.trim()));
 }
+
 macro_rules! test {
     ($name:ident) => {
         #[test]
