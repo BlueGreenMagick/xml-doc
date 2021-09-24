@@ -228,11 +228,13 @@ impl Document {
                     let raw_name = reader.decode(ev.name());
                     let mut move_children: Vec<Vec<Node>> = vec![];
                     loop {
-                        let last_eid = element_stack.pop().ok_or(Error::MalformedXML(format!(
-                            "Closing tag without corresponding opening tag: {}, pos: {}",
-                            raw_name,
-                            reader.buffer_position()
-                        )))?;
+                        let last_eid = element_stack.pop().ok_or_else(|| {
+                            Error::MalformedXML(format!(
+                                "Closing tag without corresponding opening tag: {}, pos: {}",
+                                raw_name,
+                                reader.buffer_position()
+                            ))
+                        })?;
                         let last_element = self.get_mut_element(last_eid).unwrap();
                         let last_raw_name = match &last_element.prefix {
                             Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
