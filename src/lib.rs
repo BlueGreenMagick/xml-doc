@@ -1,11 +1,11 @@
 mod error;
 
 use crate::error::{Error, Result};
-use quick_xml::events::Event;
-use quick_xml::Reader;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::{Reader, Writer};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -161,18 +161,18 @@ impl Document {
     pub fn from_str(str: &str) -> Result<Document> {
         let mut document = Document::empty();
         let reader = Reader::from_str(str);
-        document.build(reader)?;
+        document.parse(reader)?;
         Ok(document)
     }
 
     pub fn from_reader<R: BufRead>(reader: R) -> Result<Document> {
         let mut document = Document::empty();
         let reader = Reader::from_reader(reader);
-        document.build(reader)?;
+        document.parse(reader)?;
         Ok(document)
     }
 
-    fn build<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
+    fn parse<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         reader.expand_empty_elements(true);
         reader.check_end_names(false);
         reader.trim_text(true);
@@ -262,5 +262,54 @@ impl Document {
                 _ => (), // Unimplemented
             }
         }
+    }
+
+    pub fn write(&self, writer: &mut impl Write) -> Result<()> {
+        let root = self.get_root();
+        let mut writer = Writer::new_with_indent(writer, ' ' as u8, 4);
+        self.write_nodes(&mut writer, &root.children)?;
+        writer.write_event(Event::Eof)?;
+        Ok(())
+    }
+
+    fn write_nodes(&self, writer: &mut Writer<impl Write>, nodes: &Vec<Node>) -> Result<()> {
+        for node in nodes {
+            match node {
+                Node::Element(eid) => self.write_element(writer, *eid)?,
+                Node::Text(text) => {
+                    writer.write_event(Event::Text(BytesText::from_escaped_str(text)))?
+                }
+            };
+        }
+        Ok(())
+    }
+
+    fn write_element(&self, writer: &mut Writer<impl Write>, id: ElementId) -> Result<()> {
+        let elem = self.get_element(id).unwrap();
+        let name = match &elem.prefix {
+            Some(prefix) => Cow::Owned(format!("{}:{}", prefix, &elem.name)),
+            None => Cow::Borrowed(&elem.name),
+        };
+        let name_bytes = name.as_bytes();
+        let mut start = BytesStart::borrowed_name(name_bytes);
+        for (key, val) in &elem.attributes {
+            start.push_attribute((key.as_bytes(), val.as_bytes()));
+        }
+        for (prefix, val) in &elem.namespaces {
+            let attr_name = if prefix.len() == 0 {
+                "xmlns".to_string()
+            } else {
+                format!("{}:{}", prefix, val)
+            };
+            start.push_attribute((attr_name.as_bytes(), val.as_bytes()));
+        }
+        if elem.children.len() > 0 {
+            writer.write_event(Event::Start(start))?;
+            self.write_nodes(writer, &elem.children)?;
+            writer.write_event(Event::End(BytesEnd::borrowed(name_bytes)))?;
+        } else {
+            writer.write_event(Event::Empty(start))?
+        }
+        Ok(())
     }
 }
