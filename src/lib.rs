@@ -61,7 +61,6 @@ impl Document {
         attributes: HashMap<String, String>,
         namespaces: HashMap<String, String>,
     ) -> ElementId {
-        self.counter += 1;
         let elem = Element {
             prefix,
             name,
@@ -71,7 +70,8 @@ impl Document {
             children: vec![],
         };
         self.store.push(elem);
-        self.counter
+        self.counter += 1;
+        self.counter - 1
     }
 
     pub fn get_element(&self, id: ElementId) -> Option<&Element> {
@@ -90,7 +90,9 @@ impl Document {
     }
 
     fn build<B: std::io::BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        let mut count = 0;
+        reader.expand_empty_elements(true);
+        reader.trim_text(true);
+
         let mut buf = Vec::new();
         let mut element_stack: Vec<ElementId> = Vec::new();
 
@@ -142,7 +144,7 @@ impl Document {
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
-                    element_stack.pop();
+                    element_stack.pop(); // TODO: check name of end element
                 }
                 Ok(Event::Text(e)) => {
                     let node = Node::Text(e.unescape_and_decode(&reader)?);
