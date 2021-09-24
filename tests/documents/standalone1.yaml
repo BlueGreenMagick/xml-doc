@@ -1,0 +1,9 @@
+Root:
+  - Element: 
+      name: p
+      children:
+        - Element:
+            name: br
+        - Element:
+            name: hr
+        - Text: "Text"

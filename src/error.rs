@@ -6,6 +6,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     RootCannotMove,
     ElementNotExist(ElementId),
+    MalformedXML(String),
     LazyError(quick_xml::Error),
 }
 

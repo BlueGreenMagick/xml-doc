@@ -1,0 +1,16 @@
+Root:
+  - Element:
+      name: p
+      children:
+        - Element:
+            name: br
+        - Element:
+            name: span
+            children:
+              - Text: "Hello"
+              - Element:
+                  name: br
+              - Text: "world"
+        - Text: "!"
+        - Element: 
+            name: hr

@@ -106,4 +106,7 @@ test!(basic1);
 test!(basic2);
 test!(basic3);
 test!(basic4);
+test!(basic5);
 test!(basic6);
+test!(standalone1);
+test!(standalone2);
