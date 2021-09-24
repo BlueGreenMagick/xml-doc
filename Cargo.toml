@@ -7,13 +7,12 @@ edition = "2018"
 quick-xml = { version = "0.22", features = ["encoding"] }
 
 [dev-dependencies]
-bencher = "0.1"
+criterion = "0.3"
 minidom = "0.12"
 roxmltree = "0.14"
 sxd-document = "0.3"
 xmltree = "0.10"
 
 [[bench]]
-name = "benchmark"
-path = "benches/bench.rs"
+name = "bench"
 harness = false

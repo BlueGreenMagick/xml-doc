@@ -1,14 +1,13 @@
-use bencher::Bencher;
-use bencher::{benchmark_group, benchmark_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 use std::path::Path;
 use std::str::FromStr;
 
 macro_rules! bench {
     ($filename:literal, $name:ident, $func:path) => {
-        fn $name(bencher: &mut Bencher) {
+        fn $name(c: &mut Criterion) {
             let path = Path::new("benches").join($filename);
             let text = std::fs::read_to_string(path).unwrap();
-            bencher.iter(|| $func(&text).unwrap())
+            c.bench_function(stringify!($name), |b| b.iter(|| $func(&text).unwrap()));
         }
     };
 }
@@ -52,20 +51,20 @@ bench!("tiny.xml", tiny_minidom, minidom::Element::from_str);
 bench!("medium.xml", medium_minidom, minidom::Element::from_str);
 bench!("large.xml", large_minidom, minidom::Element::from_str);
 
-benchmark_group!(
+criterion_group!(
     quickxmltree,
     tiny_quickxmltree,
     medium_quickxmltree,
     large_quickxmltree
 );
-benchmark_group!(roxmltree, tiny_roxmltree, medium_roxmltree, large_roxmltree);
-benchmark_group!(xmltree, tiny_xmltree, medium_xmltree, large_xmltree);
-benchmark_group!(
+criterion_group!(roxmltree, tiny_roxmltree, medium_roxmltree, large_roxmltree);
+criterion_group!(xmltree, tiny_xmltree, medium_xmltree, large_xmltree);
+criterion_group!(
     sdx,
     tiny_sdx_document,
     medium_sdx_document,
     large_sdx_document,
 );
-benchmark_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
+criterion_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
 
-benchmark_main!(quickxmltree, roxmltree, xmltree, sdx, minidom);
+criterion_main!(quickxmltree, roxmltree, xmltree, sdx, minidom);
