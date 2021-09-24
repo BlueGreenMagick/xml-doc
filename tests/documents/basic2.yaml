@@ -1,0 +1,5 @@
+Root:
+  - Element:
+      name: elem
+      children:
+        - Text: "Text"
