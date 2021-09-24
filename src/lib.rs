@@ -226,7 +226,7 @@ impl Document {
                 }
                 Ok(Event::End(ref ev)) => {
                     let raw_name = reader.decode(ev.name());
-                    let mut move_children: Vec<Vec<Node>> = vec![];
+                    let mut move_children: Vec<Node> = vec![];
                     loop {
                         let last_eid = element_stack.pop().ok_or_else(|| {
                             Error::MalformedXML(format!(
@@ -240,15 +240,14 @@ impl Document {
                             Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
                             None => Cow::Borrowed(&last_element.name),
                         };
-                        if *last_raw_name == raw_name {
-                            while let Some(nodes) = move_children.pop() {
-                                last_element.children.extend(nodes);
-                            }
+                        if last_raw_name == raw_name {
+                            last_element.children.extend(move_children);
                             break;
                         };
                         if last_element.children.len() > 0 {
-                            move_children
-                                .push(std::mem::replace(&mut last_element.children, Vec::new()))
+                            last_element.children.extend(move_children);
+                            move_children =
+                                std::mem::replace(&mut last_element.children, Vec::new());
                         }
                     }
                 }
