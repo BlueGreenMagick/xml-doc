@@ -7,6 +7,20 @@ use std::collections::HashMap;
 
 pub type ElementId = usize;
 
+#[cfg(debug_assertions)]
+macro_rules! debug {
+    ($x:expr) => {
+        println!("{:?}", $x)
+    };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! debug {
+    ($x:expr) => {
+        std::convert::identity($x)
+    };
+}
+
 #[derive(Debug)]
 pub enum Node {
     Element(ElementId),
@@ -81,7 +95,9 @@ impl Document {
         let mut element_stack: Vec<ElementId> = Vec::new();
 
         loop {
-            match reader.read_event(&mut buf) {
+            let ev = reader.read_event(&mut buf);
+            debug!(ev);
+            match ev {
                 Ok(Event::Start(ref ev)) => {
                     let raw_name = reader.decode(ev.name());
                     let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
