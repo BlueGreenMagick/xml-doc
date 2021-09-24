@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::HashMap;
+use std::io::BufRead;
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -170,7 +171,14 @@ impl Document {
         Ok(document)
     }
 
-    fn build<B: std::io::BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
+    pub fn from_reader<R: BufRead>(reader: R) -> Result<Document> {
+        let mut document = Document::empty();
+        let reader = Reader::from_reader(reader);
+        document.build(reader)?;
+        Ok(document)
+    }
+
+    fn build<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         reader.expand_empty_elements(true);
         reader.trim_text(true);
 
