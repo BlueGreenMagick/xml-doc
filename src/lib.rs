@@ -39,7 +39,7 @@ pub struct Element {
     pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
     parent: Option<ElementId>,
-    pub children: Vec<Node>,
+    children: Vec<Node>,
 }
 
 impl PartialEq for Element {
@@ -52,8 +52,16 @@ impl PartialEq for Element {
 }
 
 impl Element {
+    pub fn has_parent(&self) -> bool {
+        self.parent != None
+    }
+
     pub fn get_parent(&self) -> Option<ElementId> {
         self.parent
+    }
+
+    pub fn get_children(&self) -> &Vec<Node> {
+        &self.children
     }
 
     pub fn children_element(&self) -> Vec<ElementId> {
@@ -67,6 +75,30 @@ impl Element {
                 }
             })
             .collect()
+    }
+
+    pub fn remove_child_at(&mut self, index: usize) -> Result<Node> {
+        let node = self.children.get(index).ok_or(Error::NotFound)?;
+        if let Node::Element(_) = node {
+            return Err(Error::IsAnElement);
+        }
+        Ok(self.children.remove(index))
+    }
+
+    fn remove_child_element(&mut self, id: ElementId) {
+        let idx = self
+            .children
+            .iter()
+            .position(|node| {
+                if let Node::Element(e) = node {
+                    if *e == id {
+                        return true;
+                    }
+                }
+                false
+            })
+            .unwrap();
+        self.children.remove(idx);
     }
 }
 
@@ -127,6 +159,22 @@ impl Document {
 
     pub fn get_mut_root(&mut self) -> &mut Element {
         self.store.get_mut(0).expect("Root element is gone!")
+    }
+
+    pub fn remove_from_parent(&mut self, id: ElementId) -> Result<()> {
+        if id == 0 {
+            return Err(Error::RootCannotMove);
+        }
+        let mut elem = self.get_mut_element(id)?;
+        match elem.parent {
+            None => return Ok(()),
+            Some(parentid) => {
+                elem.parent = None;
+                let parent = self.get_mut_element(parentid).unwrap();
+                parent.remove_child_element(id);
+            }
+        }
+        Ok(())
     }
 
     pub fn set_parent(&mut self, id: ElementId, new_parentid: ElementId) -> Result<()> {

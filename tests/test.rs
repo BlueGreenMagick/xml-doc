@@ -19,7 +19,7 @@ fn to_yaml(document: &Document) -> String {
     write_line("Root:", depth, &mut buf);
     depth += 1;
     let root_node = document.get_element(0).unwrap();
-    render_nodes(document, &root_node.children, depth, &mut buf);
+    render_nodes(document, root_node.get_children(), depth, &mut buf);
     buf
 }
 
@@ -54,7 +54,7 @@ fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut Str
         write_line("namespaces:", depth, buf);
         write_hashmap_alphabetical(namespaces, depth, buf);
     }
-    let children = &elem.children;
+    let children = elem.get_children();
     if children.len() > 0 {
         write_line("children:", depth, buf);
         depth += 1;
