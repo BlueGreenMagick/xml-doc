@@ -118,3 +118,4 @@ test!(basic6);
 test!(standalone1);
 test!(standalone2);
 test!(error1);
+test!(error2);
