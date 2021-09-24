@@ -1,7 +1,7 @@
 mod error;
 
 use crate::error::{Error, Result};
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::HashMap;
 use std::io::BufRead;
@@ -10,13 +10,6 @@ use std::io::BufRead;
 macro_rules! debug {
     ($x:expr) => {
         println!("{:?}", $x)
-    };
-}
-
-#[cfg(not(debug_assertions))]
-macro_rules! debug {
-    ($x:expr) => {
-        $x
     };
 }
 
@@ -189,7 +182,8 @@ impl Document {
 
         loop {
             let ev = reader.read_event(&mut buf);
-            debug!(&ev);
+            #[cfg(debug_assertions)]
+            debug!(ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
                     let raw_name = reader.decode(ev.name());

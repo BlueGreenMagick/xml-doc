@@ -1,4 +1,4 @@
-use quick_xml_tree::{Document, Element, ElementId, Node};
+use quick_xml_tree::{Document, ElementId, Node};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
