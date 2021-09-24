@@ -16,7 +16,7 @@ macro_rules! debug {
 #[cfg(not(debug_assertions))]
 macro_rules! debug {
     ($x:expr) => {
-        std::convert::identity($x)
+        $x
     };
 }
 
@@ -187,7 +187,7 @@ impl Document {
 
         loop {
             let ev = reader.read_event(&mut buf);
-            debug!(ev);
+            debug!(&ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
                     let raw_name = reader.decode(ev.name());
