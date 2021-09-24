@@ -1,6 +1,16 @@
 use quick_xml_tree::{Document, Element, ElementId, Node};
+use std::fmt;
 use std::fmt::Write;
 use std::path::Path;
+
+#[derive(Clone, PartialEq)]
+struct TStr<'a>(pub &'a str);
+
+impl<'a> fmt::Debug for TStr<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\n{}\n", self.0)
+    }
+}
 
 fn to_yaml(document: &Document) -> String {
     let mut buf = String::new();
@@ -45,15 +55,20 @@ fn write_line(text: &str, depth: usize, buf: &mut String) {
 }
 
 fn test(file_name: &str) {
-    let yaml_file = Path::new("tests/documents").join(format!("{}.yaml", file_name));
-    let xml_file = Path::new("tests/documents").join(format!("{}.xml", file_name));
+    let path = Path::new("tests/documents").join(file_name);
+    let yaml_file = path.with_extension("yaml");
+    let xml_file = path.with_extension("xml");
     let expected = std::fs::read_to_string(&yaml_file).unwrap();
     let xml_raw_str = std::fs::read_to_string(&xml_file).unwrap();
     let document = Document::from_str(&xml_raw_str).unwrap();
-    assert_eq!(to_yaml(&document), expected);
+    assert_eq!(TStr(&to_yaml(&document).trim()), TStr(expected.trim()));
+}
+macro_rules! test {
+    ($name:ident) => {
+        #[test]
+        fn $name() {
+            test(stringify!($name));
+        }
+    };
 }
 
-#[test]
-fn read_documents() {
-    test("basic1")
-}
