@@ -186,7 +186,7 @@ impl Document {
                     let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
                     let (prefix, name) = if splitted.len() > 1 {
                         let prefix = splitted[0].to_string();
-                        let name = splitted[0].to_string();
+                        let name = splitted[1].to_string();
                         (Some(prefix), name)
                     } else {
                         (None, splitted[0].to_string())

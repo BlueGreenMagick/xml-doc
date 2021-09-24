@@ -1,0 +1,13 @@
+Root:
+  - Element:
+      name: root
+      namespaces:
+        pre: "http://example.xml"
+      children:
+        - Element:
+            prefix: pre
+            name: name
+            attributes:
+              id: "id"
+            children:
+              - Text: "..."

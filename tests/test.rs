@@ -100,3 +100,4 @@ test!(basic1);
 test!(basic2);
 test!(basic3);
 test!(basic4);
+test!(basic6);

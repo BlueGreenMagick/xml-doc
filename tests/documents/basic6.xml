@@ -1,0 +1,5 @@
+<root xmlns:pre="http://example.xml">
+    <pre:name id="id">
+        ...
+    </pre:name>
+</root>
