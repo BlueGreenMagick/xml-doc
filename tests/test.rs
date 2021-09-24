@@ -89,8 +89,15 @@ fn test(file_name: &str) {
         .collect::<Vec<&str>>()
         .join("\n");
     let xml_raw_str = std::fs::read_to_string(&xml_file).unwrap();
-    let document = Document::from_str(&xml_raw_str).unwrap();
-    assert_eq!(TStr(&to_yaml(&document).trim()), TStr(expected.trim()));
+    let result = match Document::from_str(&xml_raw_str) {
+        Ok(document) => to_yaml(&document),
+        Err(error) => {
+            let debug_str = format!("{:?}", error);
+            let variant_name = debug_str.splitn(2, "(").next().unwrap();
+            format!("error: {}", variant_name)
+        }
+    };
+    assert_eq!(TStr(result.trim()), TStr(expected.trim()));
 }
 
 macro_rules! test {
@@ -110,3 +117,4 @@ test!(basic5);
 test!(basic6);
 test!(standalone1);
 test!(standalone2);
+test!(error1);
