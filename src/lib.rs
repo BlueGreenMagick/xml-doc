@@ -3,6 +3,7 @@ mod error;
 use crate::error::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::BufRead;
 
@@ -178,7 +179,6 @@ impl Document {
 
         let mut buf = Vec::new();
         let mut element_stack: Vec<ElementId> = vec![0]; // root element in element_stack
-        let mut raw_names_stack: Vec<String> = vec![String::new()];
 
         loop {
             let ev = reader.read_event(&mut buf);
@@ -187,7 +187,6 @@ impl Document {
             match ev {
                 Ok(Event::Start(ref ev)) => {
                     let raw_name = reader.decode(ev.name());
-                    raw_names_stack.push(raw_name.to_string());
                     let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
                     let (prefix, name) = if splitted.len() > 1 {
                         let prefix = splitted[0].to_string();
@@ -229,15 +228,17 @@ impl Document {
                     let raw_name = reader.decode(ev.name());
                     let mut move_children: Vec<Vec<Node>> = vec![];
                     loop {
-                        let last_name =
-                            raw_names_stack.pop().ok_or(Error::MalformedXML(format!(
-                                "Closing tag without corresponding opening tag: {}, pos: {}",
-                                raw_name,
-                                reader.buffer_position()
-                            )))?;
-                        let last_eid = element_stack.pop().unwrap();
+                        let last_eid = element_stack.pop().ok_or(Error::MalformedXML(format!(
+                            "Closing tag without corresponding opening tag: {}, pos: {}",
+                            raw_name,
+                            reader.buffer_position()
+                        )))?;
                         let last_element = self.get_mut_element(last_eid).unwrap();
-                        if last_name == raw_name {
+                        let last_raw_name = match &last_element.prefix {
+                            Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
+                            None => Cow::Borrowed(&last_element.name),
+                        };
+                        if *last_raw_name == raw_name {
                             while let Some(nodes) = move_children.pop() {
                                 last_element.children.extend(nodes);
                             }
