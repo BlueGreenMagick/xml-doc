@@ -1,5 +1,5 @@
+use easyxml::{Document, ElementId, Node, ReadOptions};
 use itertools::Itertools;
-use quick_xml_tree::{Document, ElementId, Node, ReadOptions};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;

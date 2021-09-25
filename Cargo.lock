@@ -172,6 +172,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "easyxml"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "itertools",
+ "minidom",
+ "quick-xml 0.22.0",
+ "roxmltree",
+ "sxd-document",
+ "xmltree",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -355,19 +368,6 @@ checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
 dependencies = [
  "encoding_rs",
  "memchr",
-]
-
-[[package]]
-name = "quick_xml_tree"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "itertools",
- "minidom",
- "quick-xml 0.22.0",
- "roxmltree",
- "sxd-document",
- "xmltree",
 ]
 
 [[package]]

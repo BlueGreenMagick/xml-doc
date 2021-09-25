@@ -12,21 +12,9 @@ macro_rules! bench {
     };
 }
 
-bench!(
-    "tiny.xml",
-    tiny_quickxmltree,
-    quick_xml_tree::Document::from_str
-);
-bench!(
-    "medium.xml",
-    medium_quickxmltree,
-    quick_xml_tree::Document::from_str
-);
-bench!(
-    "large.xml",
-    large_quickxmltree,
-    quick_xml_tree::Document::from_str
-);
+bench!("tiny.xml", tiny_easyxml, easyxml::Document::from_str);
+bench!("medium.xml", medium_easyxml, easyxml::Document::from_str);
+bench!("large.xml", large_easyxml, easyxml::Document::from_str);
 
 bench!("tiny.xml", tiny_minidom, minidom::Element::from_str);
 bench!("medium.xml", medium_minidom, minidom::Element::from_str);
@@ -54,12 +42,12 @@ bench!("large.xml", large_sdx_document, sxd_document::parser::parse);
 criterion_group! {
     name = tiny;
     config = Criterion::default().sample_size(200);
-    targets = tiny_quickxmltree, tiny_minidom, tiny_roxmltree, tiny_xmltree, tiny_sdx_document
+    targets = tiny_easyxml, tiny_minidom, tiny_roxmltree, tiny_xmltree, tiny_sdx_document
 }
 
 criterion_group!(
     medium,
-    medium_quickxmltree,
+    medium_easyxml,
     medium_minidom,
     medium_roxmltree,
     medium_xmltree,
@@ -69,15 +57,10 @@ criterion_group!(
 criterion_group! {
     name = large;
     config = Criterion::default().sample_size(50);
-    targets = large_quickxmltree, large_minidom, large_roxmltree, large_xmltree, large_sdx_document,
+    targets = large_easyxml, large_minidom, large_roxmltree, large_xmltree, large_sdx_document,
 }
 
-criterion_group!(
-    quickxmltree,
-    tiny_quickxmltree,
-    medium_quickxmltree,
-    large_quickxmltree
-);
+criterion_group!(easyxml, tiny_easyxml, medium_easyxml, large_easyxml);
 criterion_group!(roxmltree, tiny_roxmltree, medium_roxmltree, large_roxmltree);
 criterion_group!(xmltree, tiny_xmltree, medium_xmltree, large_xmltree);
 criterion_group!(
@@ -88,4 +71,4 @@ criterion_group!(
 );
 criterion_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
 
-criterion_main!(quickxmltree);
+criterion_main!(easyxml);
