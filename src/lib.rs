@@ -218,7 +218,10 @@ impl Document {
         new_parent_elem.children.push(Node::Element(id));
         Ok(())
     }
+}
 
+// Read and write
+impl Document {
     pub fn from_str(str: &str) -> Result<Document> {
         let mut document = Document::new();
         document.read_str(str)?;
@@ -293,12 +296,14 @@ impl Document {
                             _ => true,
                         })
                         .collect::<Result<HashMap<String, String>>>()?;
-                    let parent = element_stack.last().copied();
-                    let element = self.new_element(parent, prefix, name, attributes, namespaces);
+                    let parent_id = element_stack.last().unwrap();
+                    let element =
+                        self.new_element(Some(*parent_id), prefix, name, attributes, namespaces);
                     let node = Node::Element(element);
-                    //TODO: make sure unwrap isn't called.
-                    let id = parent.unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    self.get_mut_element(*parent_id)
+                        .unwrap()
+                        .children
+                        .push(node);
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
