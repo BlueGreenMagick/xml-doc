@@ -28,6 +28,10 @@ bench!(
     quick_xml_tree::Document::from_str
 );
 
+bench!("tiny.xml", tiny_minidom, minidom::Element::from_str);
+bench!("medium.xml", medium_minidom, minidom::Element::from_str);
+bench!("large.xml", large_minidom, minidom::Element::from_str);
+
 bench!("tiny.xml", tiny_roxmltree, roxmltree::Document::parse);
 bench!("medium.xml", medium_roxmltree, roxmltree::Document::parse);
 bench!("large.xml", large_roxmltree, roxmltree::Document::parse);
@@ -47,9 +51,26 @@ bench!(
 );
 bench!("large.xml", large_sdx_document, sxd_document::parser::parse);
 
-bench!("tiny.xml", tiny_minidom, minidom::Element::from_str);
-bench!("medium.xml", medium_minidom, minidom::Element::from_str);
-bench!("large.xml", large_minidom, minidom::Element::from_str);
+criterion_group! {
+    name = tiny;
+    config = Criterion::default().sample_size(200);
+    targets = tiny_quickxmltree, tiny_minidom, tiny_roxmltree, tiny_xmltree, tiny_sdx_document
+}
+
+criterion_group!(
+    medium,
+    medium_quickxmltree,
+    medium_minidom,
+    medium_roxmltree,
+    medium_xmltree,
+    medium_sdx_document,
+);
+
+criterion_group! {
+    name = large;
+    config = Criterion::default().sample_size(50);
+    targets = large_quickxmltree, large_minidom, large_roxmltree, large_xmltree, large_sdx_document,
+}
 
 criterion_group!(
     quickxmltree,
@@ -67,4 +88,4 @@ criterion_group!(
 );
 criterion_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
 
-criterion_main!(quickxmltree, roxmltree, xmltree, sdx, minidom);
+criterion_main!(quickxmltree);
