@@ -307,7 +307,7 @@ impl Document {
         Ok(())
     }
 
-    fn from_bytes_start<B: BufRead>(
+    fn read_bytes_start<B: BufRead>(
         &mut self,
         reader: &Reader<B>,
         element_stack: &Vec<ElementId>,
@@ -323,26 +323,20 @@ impl Document {
             (None, splitted[0].to_string())
         };
         let mut namespaces = HashMap::new();
-        let attributes = ev
-            .attributes()
-            .map(|o| {
-                let o = o?;
-                let key = reader.decode(o.key).to_string();
-                let value = o.unescape_and_decode_value(&reader)?;
-                Ok((key, value))
-            })
-            .filter(|o| match *o {
-                Ok((ref key, ref value)) if key == "xmlns" => {
-                    namespaces.insert(String::new(), value.clone());
-                    false
-                }
-                Ok((ref key, ref value)) if key.starts_with("xmlns:") => {
-                    namespaces.insert(key[6..].to_owned(), value.to_owned());
-                    false
-                }
-                _ => true,
-            })
-            .collect::<Result<HashMap<String, String>>>()?;
+        let mut attributes = HashMap::new();
+        for attr in ev.attributes() {
+            let attr = attr?;
+            let key = reader.decode(attr.key).to_string();
+            let value = attr.unescape_and_decode_value(&reader)?;
+            if key == "xmlns" {
+                namespaces.insert(String::new(), value);
+                continue;
+            } else if key.starts_with("xmlns:") {
+                namespaces.insert(key[6..].to_owned(), value);
+                continue;
+            }
+            attributes.insert(key, value);
+        }
         let parent_id = element_stack.last().unwrap();
         let element = self.add_element(Some(*parent_id), prefix, name, attributes, namespaces);
         let node = Node::Element(element);
@@ -366,7 +360,7 @@ impl Document {
             debug!(ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
-                    let element = self.from_bytes_start(&reader, &element_stack, ev)?;
+                    let element = self.read_bytes_start(&reader, &element_stack, ev)?;
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
@@ -415,7 +409,7 @@ impl Document {
                     }
                 }
                 Ok(Event::Empty(ref ev)) => {
-                    self.from_bytes_start(&reader, &element_stack, ev)?;
+                    self.read_bytes_start(&reader, &element_stack, ev)?;
                 }
                 Ok(Event::Text(ev)) => {
                     let node = Node::Text(ev.unescape_and_decode(&reader)?);
