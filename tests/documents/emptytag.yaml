@@ -1,0 +1,10 @@
+Root:
+  - Element:
+      name: root
+      children:
+        - Element:
+            name: br
+        - Element:
+            name: p
+  - Element:
+      name: out

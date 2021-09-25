@@ -111,10 +111,14 @@ where
 
     // Options
     let standalone_opts = [true, false];
-    let opts = [standalone_opts];
+    let empty_text_node_opts = [true, false];
+    let opts = [standalone_opts, empty_text_node_opts];
 
     for k in opts.iter().multi_cartesian_product() {
-        let read_options = ReadOptions { standalone: *k[0] };
+        let read_options = ReadOptions {
+            standalone: *k[0],
+            empty_text_node: *k[1],
+        };
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);
         // Read xml document
@@ -140,6 +144,17 @@ where
 #[test]
 fn basic() {
     test("basic.xml", |_| "basic.yaml".to_string())
+}
+
+#[test]
+fn emptytag() {
+    test("emptytag.xml", |opts| {
+        if opts.empty_text_node == true {
+            "emptytag_emptytext.yaml"
+        } else {
+            "emptytag.yaml"
+        }
+    })
 }
 
 #[test]

@@ -130,11 +130,15 @@ impl Element {
 #[derive(Debug, Clone)]
 pub struct ReadOptions {
     pub standalone: bool, // Whether to accept tags that doesn't have closing tags like <br>
+    pub empty_text_node: bool, // <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 }
 
 impl ReadOptions {
     pub fn default() -> ReadOptions {
-        ReadOptions { standalone: false }
+        ReadOptions {
+            standalone: false,
+            empty_text_node: true,
+        }
     }
 }
 
@@ -294,8 +298,53 @@ impl Document {
         Ok(())
     }
 
+    fn from_bytes_start<B: BufRead>(
+        &mut self,
+        reader: &Reader<B>,
+        element_stack: &Vec<ElementId>,
+        ev: &BytesStart,
+    ) -> Result<ElementId> {
+        let raw_name = reader.decode(ev.name());
+        let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
+        let (prefix, name) = if splitted.len() > 1 {
+            let prefix = splitted[0].to_string();
+            let name = splitted[1].to_string();
+            (Some(prefix), name)
+        } else {
+            (None, splitted[0].to_string())
+        };
+        let mut namespaces = HashMap::new();
+        let attributes = ev
+            .attributes()
+            .map(|o| {
+                let o = o?;
+                let key = reader.decode(o.key).to_string();
+                let value = o.unescape_and_decode_value(&reader)?;
+                Ok((key, value))
+            })
+            .filter(|o| match *o {
+                Ok((ref key, ref value)) if key == "xmlns" => {
+                    namespaces.insert(String::new(), value.clone());
+                    false
+                }
+                Ok((ref key, ref value)) if key.starts_with("xmlns:") => {
+                    namespaces.insert(key[6..].to_owned(), value.to_owned());
+                    false
+                }
+                _ => true,
+            })
+            .collect::<Result<HashMap<String, String>>>()?;
+        let parent_id = element_stack.last().unwrap();
+        let element = self.add_element(Some(*parent_id), prefix, name, attributes, namespaces);
+        let node = Node::Element(element);
+        self.get_mut_element(*parent_id)
+            .unwrap()
+            .children
+            .push(node);
+        Ok(element)
+    }
+
     fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        reader.expand_empty_elements(true);
         reader.check_end_names(!self.read_opts.standalone);
         reader.trim_text(true);
 
@@ -308,47 +357,11 @@ impl Document {
             debug!(ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
-                    let raw_name = reader.decode(ev.name());
-                    let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
-                    let (prefix, name) = if splitted.len() > 1 {
-                        let prefix = splitted[0].to_string();
-                        let name = splitted[1].to_string();
-                        (Some(prefix), name)
-                    } else {
-                        (None, splitted[0].to_string())
-                    };
-                    let mut namespaces = HashMap::new();
-                    let attributes = ev
-                        .attributes()
-                        .map(|o| {
-                            let o = o?;
-                            let key = reader.decode(o.key).to_string();
-                            let value = o.unescape_and_decode_value(&reader)?;
-                            Ok((key, value))
-                        })
-                        .filter(|o| match *o {
-                            Ok((ref key, ref value)) if key == "xmlns" => {
-                                namespaces.insert(String::new(), value.clone());
-                                false
-                            }
-                            Ok((ref key, ref value)) if key.starts_with("xmlns:") => {
-                                namespaces.insert(key[6..].to_owned(), value.to_owned());
-                                false
-                            }
-                            _ => true,
-                        })
-                        .collect::<Result<HashMap<String, String>>>()?;
-                    let parent_id = element_stack.last().unwrap();
-                    let element =
-                        self.add_element(Some(*parent_id), prefix, name, attributes, namespaces);
-                    let node = Node::Element(element);
-                    self.get_mut_element(*parent_id)
-                        .unwrap()
-                        .children
-                        .push(node);
+                    let element = self.from_bytes_start(&reader, &element_stack, ev)?;
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
+                    let opts_empty_text_node = self.read_opts.empty_text_node;
                     if self.read_opts.standalone {
                         let raw_name = reader.decode(ev.name());
                         let mut move_children: Vec<Node> = vec![];
@@ -368,7 +381,11 @@ impl Document {
                                 None => Cow::Borrowed(&last_element.name),
                             };
                             if last_raw_name == raw_name {
-                                last_element.children.extend(move_children);
+                                if move_children.len() > 0 {
+                                    last_element.children.extend(move_children);
+                                } else if opts_empty_text_node && last_element.children.len() == 0 {
+                                    last_element.children.push(Node::Text(String::new()));
+                                }
                                 break;
                             };
                             if last_element.children.len() > 0 {
@@ -378,11 +395,21 @@ impl Document {
                             }
                         }
                     } else {
-                        element_stack.pop(); // quick-xml checks if tag names match for us
+                        let elemid = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+                        if opts_empty_text_node {
+                            let elem = self.get_mut_element(elemid).unwrap();
+                            // distinguish <tag></tag> and <tag />
+                            if elem.children.len() == 0 {
+                                elem.children.push(Node::Text(String::new()));
+                            }
+                        }
                     }
                 }
-                Ok(Event::Text(e)) => {
-                    let node = Node::Text(e.unescape_and_decode(&reader)?);
+                Ok(Event::Empty(ref ev)) => {
+                    self.from_bytes_start(&reader, &element_stack, ev)?;
+                }
+                Ok(Event::Text(ev)) => {
+                    let node = Node::Text(ev.unescape_and_decode(&reader)?);
                     let &id = element_stack.last().unwrap();
                     self.get_mut_element(id).unwrap().children.push(node);
                 }
