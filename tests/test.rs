@@ -62,10 +62,7 @@ fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut Str
     write_line("- Element:", depth, buf);
     depth += 2;
 
-    if let Some(prefix) = &elem.prefix {
-        write_line(&format!("prefix: {}", prefix), depth, buf);
-    }
-    let name = &elem.name;
+    let name = &elem.raw_name;
     write_line(&format!("name: {}", name), depth, buf);
 
     let attrs = &elem.attributes;

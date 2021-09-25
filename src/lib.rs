@@ -3,7 +3,6 @@ mod error;
 pub use crate::error::{Error, Result};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 
@@ -43,8 +42,7 @@ impl Node {
 #[derive(Debug)]
 pub struct Element {
     id: ElementId,
-    pub prefix: Option<String>,
-    pub name: String,
+    pub raw_name: String,
     pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
     parent: Option<ElementId>,
@@ -58,6 +56,23 @@ impl PartialEq for Element {
 }
 
 impl Element {
+    pub fn get_prefix_name(&self) -> (&str, &str) {
+        let splitted: Vec<&str> = self.raw_name.splitn(2, ':').collect();
+        if splitted.len() == 1 {
+            ("", splitted[0])
+        } else {
+            (splitted[0], splitted[1])
+        }
+    }
+
+    pub fn get_name(&self) -> &str {
+        self.get_prefix_name().1
+    }
+
+    pub fn get_prefix(&self) -> &str {
+        self.get_prefix_name().0
+    }
+
     pub fn has_parent(&self) -> bool {
         self.parent != None
     }
@@ -163,27 +178,25 @@ impl Document {
             read_opts: ReadOptions::default(),
         };
         // create root element
-        doc.add_element(None, None, String::new(), HashMap::new(), HashMap::new());
+        doc.add_element(None, String::new(), HashMap::new(), HashMap::new());
         doc
     }
 
     pub fn create_element<S: Into<String>>(&mut self, name: S) -> &mut Element {
-        let elemid = self.add_element(None, None, name.into(), HashMap::new(), HashMap::new());
+        let elemid = self.add_element(None, name.into(), HashMap::new(), HashMap::new());
         self.get_mut_element(elemid).unwrap()
     }
 
     fn add_element(
         &mut self,
         parent: Option<ElementId>,
-        prefix: Option<String>,
-        name: String,
+        raw_name: String,
         attributes: HashMap<String, String>,
         namespaces: HashMap<String, String>,
     ) -> ElementId {
         let elem = Element {
             id: self.counter,
-            prefix,
-            name,
+            raw_name,
             attributes,
             namespaces,
             parent,
@@ -310,15 +323,7 @@ impl Document {
         element_stack: &Vec<ElementId>,
         ev: &BytesStart,
     ) -> Result<ElementId> {
-        let raw_name = reader.decode(ev.name());
-        let splitted: Vec<&str> = raw_name.splitn(2, ':').collect();
-        let (prefix, name) = if splitted.len() > 1 {
-            let prefix = splitted[0].to_string();
-            let name = splitted[1].to_string();
-            (Some(prefix), name)
-        } else {
-            (None, splitted[0].to_string())
-        };
+        let raw_name = reader.decode(ev.name()).to_string();
         let mut namespaces = HashMap::new();
         let mut attributes = HashMap::new();
         for attr in ev.attributes() {
@@ -335,7 +340,7 @@ impl Document {
             attributes.insert(key, value);
         }
         let parent_id = *element_stack.last().unwrap();
-        let element = self.add_element(Some(parent_id), prefix, name, attributes, namespaces);
+        let element = self.add_element(Some(parent_id), raw_name, attributes, namespaces);
         let node = Node::Element(element);
         self.get_mut_element(parent_id).unwrap().children.push(node);
         Ok(element)
@@ -360,10 +365,7 @@ impl Document {
                     ))
                 })?;
                 let last_element = self.get_mut_element(last_eid).unwrap();
-                let last_raw_name = match &last_element.prefix {
-                    Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
-                    None => Cow::Borrowed(&last_element.name),
-                };
+                let last_raw_name: &str = &last_element.raw_name;
                 if last_raw_name == raw_name {
                     if !move_children.is_empty() {
                         last_element.children.extend(move_children);
@@ -504,11 +506,7 @@ impl Document {
 
     fn write_element(&self, writer: &mut Writer<impl Write>, id: ElementId) -> Result<()> {
         let elem = self.get_element(id).unwrap();
-        let name = match &elem.prefix {
-            Some(prefix) => Cow::Owned(format!("{}:{}", prefix, &elem.name)),
-            None => Cow::Borrowed(&elem.name),
-        };
-        let name_bytes = name.as_bytes();
+        let name_bytes = elem.raw_name.as_bytes();
         let mut start = BytesStart::borrowed_name(name_bytes);
         for (key, val) in &elem.attributes {
             start.push_attribute((key.as_bytes(), val.as_bytes()));
@@ -579,7 +577,13 @@ mod tests {
         let child_elements = document.get_element(root).unwrap().child_elements();
         let foo = *child_elements.get(0).unwrap();
         let bar = *child_elements.get(1).unwrap();
-        let c = document.get_element(bar).unwrap().child_elements()[0];
+        let bar_elem = document.get_element(bar).unwrap();
+        let c = bar_elem.child_elements()[0];
+        let c_elem = document.get_element(c).unwrap();
+        assert_eq!(c_elem.get_prefix_name(), ("", "c"));
+        assert_eq!(bar_elem.raw_name, "p:bar");
+        assert_eq!(bar_elem.get_prefix(), "p");
+        assert_eq!(bar_elem.get_name(), "bar");
         assert_eq!(document.get_namespace(c, "").unwrap(), "ns");
         assert_eq!(document.get_namespace(c, "p").unwrap(), "in2");
         assert!(document.get_namespace(c, "random").is_err());
