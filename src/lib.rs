@@ -77,6 +77,30 @@ impl Element {
             .collect()
     }
 
+    /// Insert a non element node to its children.
+    ///
+    /// # Errors
+    /// - Error::IsAnElement if node is an element
+    ///
+    /// # Panics
+    /// Panics if index > self.get_children().len()
+    pub fn insert_child_node(&mut self, index: usize, node: Node) -> Result<()> {
+        if let Node::Element(_) = node {
+            return Err(Error::IsAnElement);
+        }
+        self.children.insert(index, node);
+        Ok(())
+    }
+
+    /// Push a non element node to its children.
+    pub fn push_child_node(&mut self, node: Node) -> Result<()> {
+        if let Node::Element(_) = node {
+            return Err(Error::IsAnElement);
+        }
+        self.children.push(node);
+        Ok(())
+    }
+
     pub fn remove_child_at(&mut self, index: usize) -> Result<Node> {
         let node = self.children.get(index).ok_or(Error::NotFound)?;
         if let Node::Element(_) = node {
