@@ -337,14 +337,60 @@ impl Document {
             }
             attributes.insert(key, value);
         }
-        let parent_id = element_stack.last().unwrap();
-        let element = self.add_element(Some(*parent_id), prefix, name, attributes, namespaces);
+        let parent_id = *element_stack.last().unwrap();
+        let element = self.add_element(Some(parent_id), prefix, name, attributes, namespaces);
         let node = Node::Element(element);
-        self.get_mut_element(*parent_id)
-            .unwrap()
-            .children
-            .push(node);
+        self.get_mut_element(parent_id).unwrap().children.push(node);
         Ok(element)
+    }
+
+    fn read_bytes_end<B: BufRead>(
+        &mut self,
+        reader: &Reader<B>,
+        element_stack: &mut Vec<ElementId>,
+        ev: &BytesEnd,
+    ) -> Result<()> {
+        let opts_empty_text_node = self.read_opts.empty_text_node;
+        if self.read_opts.standalone {
+            let raw_name = reader.decode(ev.name());
+            let mut move_children: Vec<Node> = vec![];
+            loop {
+                let last_eid = element_stack.pop().ok_or_else(|| {
+                    Error::MalformedXML(format!(
+                        "Closing tag mismatch: {}, pos: {}",
+                        raw_name,
+                        reader.buffer_position()
+                    ))
+                })?;
+                let last_element = self.get_mut_element(last_eid).unwrap();
+                let last_raw_name = match &last_element.prefix {
+                    Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
+                    None => Cow::Borrowed(&last_element.name),
+                };
+                if last_raw_name == raw_name {
+                    if move_children.len() > 0 {
+                        last_element.children.extend(move_children);
+                    } else if opts_empty_text_node && last_element.children.len() == 0 {
+                        last_element.children.push(Node::Text(String::new()));
+                    }
+                    break;
+                };
+                if last_element.children.len() > 0 {
+                    last_element.children.extend(move_children);
+                    move_children = std::mem::replace(&mut last_element.children, Vec::new());
+                }
+            }
+        } else {
+            let elemid = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+            if opts_empty_text_node {
+                let elem = self.get_mut_element(elemid).unwrap();
+                // distinguish <tag></tag> and <tag />
+                if elem.children.len() == 0 {
+                    elem.children.push(Node::Text(String::new()));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
@@ -364,49 +410,7 @@ impl Document {
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
-                    let opts_empty_text_node = self.read_opts.empty_text_node;
-                    if self.read_opts.standalone {
-                        let raw_name = reader.decode(ev.name());
-                        let mut move_children: Vec<Node> = vec![];
-                        loop {
-                            let last_eid = element_stack.pop().ok_or_else(|| {
-                                Error::MalformedXML(format!(
-                                    "Closing tag mismatch: {}, pos: {}",
-                                    raw_name,
-                                    reader.buffer_position()
-                                ))
-                            })?;
-                            let last_element = self.get_mut_element(last_eid).unwrap();
-                            let last_raw_name = match &last_element.prefix {
-                                Some(prefix) => {
-                                    Cow::Owned(format!("{}:{}", prefix, last_element.name))
-                                }
-                                None => Cow::Borrowed(&last_element.name),
-                            };
-                            if last_raw_name == raw_name {
-                                if move_children.len() > 0 {
-                                    last_element.children.extend(move_children);
-                                } else if opts_empty_text_node && last_element.children.len() == 0 {
-                                    last_element.children.push(Node::Text(String::new()));
-                                }
-                                break;
-                            };
-                            if last_element.children.len() > 0 {
-                                last_element.children.extend(move_children);
-                                move_children =
-                                    std::mem::replace(&mut last_element.children, Vec::new());
-                            }
-                        }
-                    } else {
-                        let elemid = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
-                        if opts_empty_text_node {
-                            let elem = self.get_mut_element(elemid).unwrap();
-                            // distinguish <tag></tag> and <tag />
-                            if elem.children.len() == 0 {
-                                elem.children.push(Node::Text(String::new()));
-                            }
-                        }
-                    }
+                    self.read_bytes_end(&reader, &mut element_stack, ev)?;
                 }
                 Ok(Event::Empty(ref ev)) => {
                     self.read_bytes_start(&reader, &element_stack, ev)?;
