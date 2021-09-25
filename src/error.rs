@@ -1,4 +1,5 @@
 use crate::ElementId;
+use quick_xml::Error as XMLError;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -9,11 +10,18 @@ pub enum Error {
     IsAnElement,
     ElementNotExist(ElementId),
     MalformedXML(String),
+    NotEmpty,
     LazyError(quick_xml::Error),
 }
 
-impl From<quick_xml::Error> for Error {
-    fn from(err: quick_xml::Error) -> Error {
-        Error::LazyError(err)
+impl From<XMLError> for Error {
+    fn from(err: XMLError) -> Error {
+        match err {
+            XMLError::EndEventMismatch { expected, found } => Error::MalformedXML(format!(
+                "Closing tag mismatch. Expected {}, found {}",
+                expected, found,
+            )),
+            _ => Error::LazyError(err),
+        }
     }
 }

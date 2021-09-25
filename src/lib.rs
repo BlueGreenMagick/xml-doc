@@ -1,6 +1,6 @@
 mod error;
 
-use crate::error::{Error, Result};
+pub use crate::error::{Error, Result};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::borrow::Cow;
@@ -102,17 +102,30 @@ impl Element {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ReadOptions {
+    pub standalone: bool, // Whether to accept tags that doesn't have closing tags like <br>
+}
+
+impl ReadOptions {
+    pub fn default() -> ReadOptions {
+        ReadOptions { standalone: false }
+    }
+}
+
 #[derive(Debug)]
 pub struct Document {
     counter: ElementId, // == self.store.len()
     store: Vec<Element>,
+    pub read_opts: ReadOptions,
 }
 
 impl Document {
-    fn empty() -> Document {
+    pub fn new() -> Document {
         let mut doc = Document {
             counter: 0,
             store: vec![],
+            read_opts: ReadOptions::default(),
         };
         // create root element
         doc.new_element(None, None, String::new(), HashMap::new(), HashMap::new());
@@ -207,22 +220,38 @@ impl Document {
     }
 
     pub fn from_str(str: &str) -> Result<Document> {
-        let mut document = Document::empty();
-        let reader = Reader::from_str(str);
-        document.parse(reader)?;
+        let mut document = Document::new();
+        document.read_str(str)?;
         Ok(document)
     }
 
     pub fn from_reader<R: BufRead>(reader: R) -> Result<Document> {
-        let mut document = Document::empty();
-        let reader = Reader::from_reader(reader);
-        document.parse(reader)?;
+        let mut document = Document::new();
+        document.read_reader(reader)?;
         Ok(document)
     }
 
-    fn parse<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
+    pub fn read_str(&mut self, str: &str) -> Result<()> {
+        if self.store.get(0).unwrap().children.len() > 0 {
+            return Err(Error::NotEmpty);
+        }
+        let reader = Reader::from_str(str);
+        self.read(reader)?;
+        Ok(())
+    }
+
+    pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
+        if self.store.get(0).unwrap().children.len() > 0 {
+            return Err(Error::NotEmpty);
+        }
+        let reader = Reader::from_reader(reader);
+        self.read(reader)?;
+        Ok(())
+    }
+
+    fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         reader.expand_empty_elements(true);
-        reader.check_end_names(false);
+        reader.check_end_names(!self.read_opts.standalone);
         reader.trim_text(true);
 
         let mut buf = Vec::new();
@@ -273,30 +302,36 @@ impl Document {
                     element_stack.push(element);
                 }
                 Ok(Event::End(ref ev)) => {
-                    let raw_name = reader.decode(ev.name());
-                    let mut move_children: Vec<Node> = vec![];
-                    loop {
-                        let last_eid = element_stack.pop().ok_or_else(|| {
-                            Error::MalformedXML(format!(
-                                "Closing tag without corresponding opening tag: {}, pos: {}",
-                                raw_name,
-                                reader.buffer_position()
-                            ))
-                        })?;
-                        let last_element = self.get_mut_element(last_eid).unwrap();
-                        let last_raw_name = match &last_element.prefix {
-                            Some(prefix) => Cow::Owned(format!("{}:{}", prefix, last_element.name)),
-                            None => Cow::Borrowed(&last_element.name),
-                        };
-                        if last_raw_name == raw_name {
-                            last_element.children.extend(move_children);
-                            break;
-                        };
-                        if last_element.children.len() > 0 {
-                            last_element.children.extend(move_children);
-                            move_children =
-                                std::mem::replace(&mut last_element.children, Vec::new());
+                    if self.read_opts.standalone {
+                        let raw_name = reader.decode(ev.name());
+                        let mut move_children: Vec<Node> = vec![];
+                        loop {
+                            let last_eid = element_stack.pop().ok_or_else(|| {
+                                Error::MalformedXML(format!(
+                                    "Closing tag mismatch: {}, pos: {}",
+                                    raw_name,
+                                    reader.buffer_position()
+                                ))
+                            })?;
+                            let last_element = self.get_mut_element(last_eid).unwrap();
+                            let last_raw_name = match &last_element.prefix {
+                                Some(prefix) => {
+                                    Cow::Owned(format!("{}:{}", prefix, last_element.name))
+                                }
+                                None => Cow::Borrowed(&last_element.name),
+                            };
+                            if last_raw_name == raw_name {
+                                last_element.children.extend(move_children);
+                                break;
+                            };
+                            if last_element.children.len() > 0 {
+                                last_element.children.extend(move_children);
+                                move_children =
+                                    std::mem::replace(&mut last_element.children, Vec::new());
+                            }
                         }
+                    } else {
+                        element_stack.pop(); // quick-xml checks if tag names match for us
                     }
                 }
                 Ok(Event::Text(e)) => {
@@ -305,7 +340,7 @@ impl Document {
                     self.get_mut_element(id).unwrap().children.push(node);
                 }
                 Ok(Event::Eof) => return Ok(()),
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Err(e) => return Err(Error::from(e)),
                 // TODO!
                 _ => (), // Unimplemented
             }
