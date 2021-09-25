@@ -64,7 +64,7 @@ impl Element {
         &self.children
     }
 
-    pub fn children_element(&self) -> Vec<ElementId> {
+    pub fn child_elements(&self) -> Vec<ElementId> {
         self.children
             .iter()
             .filter_map(|node| {
@@ -85,6 +85,7 @@ impl Element {
         Ok(self.children.remove(index))
     }
 
+    // After calling this method, remove parent from child.
     fn remove_child_element(&mut self, id: ElementId) {
         let idx = self
             .children
@@ -128,11 +129,16 @@ impl Document {
             read_opts: ReadOptions::default(),
         };
         // create root element
-        doc.new_element(None, None, String::new(), HashMap::new(), HashMap::new());
+        doc.add_element(None, None, String::new(), HashMap::new(), HashMap::new());
         doc
     }
 
-    fn new_element(
+    pub fn create_element<S: Into<String>>(&mut self, name: S) -> &mut Element {
+        let elemid = self.add_element(None, None, name.into(), HashMap::new(), HashMap::new());
+        self.get_mut_element(elemid).unwrap()
+    }
+
+    fn add_element(
         &mut self,
         parent: Option<ElementId>,
         prefix: Option<String>,
@@ -197,8 +203,7 @@ impl Document {
         if !self.has_element(new_parentid) {
             return Err(Error::ElementNotExist(new_parentid));
         }
-        let elem = self.get_mut_element(id)?;
-        elem.parent = Some(id); // All elementid references in Document are valid.
+        let elem = self.get_element(id)?;
 
         if let Some(parentid) = elem.get_parent() {
             let parent_children = &mut self
@@ -210,13 +215,26 @@ impl Document {
                     .iter()
                     .filter_map(|node| node.as_element())
                     .position(|x| x == id)
-                    .expect("Element not found in children"),
+                    .expect("Document is inconsistant: Element not found in children"),
             );
         }
-
+        let elem = self.get_mut_element(id)?;
+        elem.parent = Some(new_parentid);
         let new_parent_elem = self.get_mut_element(new_parentid)?;
         new_parent_elem.children.push(Node::Element(id));
         Ok(())
+    }
+
+    pub fn get_namespace(&self, id: ElementId, prefix: &str) -> Result<&str> {
+        let mut id = id;
+        while id != 0 {
+            let elem = self.get_element(id)?;
+            if let Some(value) = elem.namespaces.get(prefix) {
+                return Ok(value);
+            }
+            id = elem.parent.ok_or(Error::NotFound)?;
+        }
+        return Err(Error::NotFound);
     }
 }
 
@@ -298,7 +316,7 @@ impl Document {
                         .collect::<Result<HashMap<String, String>>>()?;
                     let parent_id = element_stack.last().unwrap();
                     let element =
-                        self.new_element(Some(*parent_id), prefix, name, attributes, namespaces);
+                        self.add_element(Some(*parent_id), prefix, name, attributes, namespaces);
                     let node = Node::Element(element);
                     self.get_mut_element(*parent_id)
                         .unwrap()
@@ -399,5 +417,63 @@ impl Document {
             writer.write_event(Event::Empty(start))?
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_element() {
+        let xml = r#"
+        <basic>
+            Text
+            <c />
+        </basic>
+        "#;
+        let mut document = Document::from_str(xml).unwrap();
+        let basic = document.get_root().get_children()[0].as_element().unwrap();
+        let p = document.create_element("p").id;
+        document.set_parent(p, basic).unwrap();
+        assert_eq!(document.get_element(p).unwrap().parent.unwrap(), basic);
+        assert_eq!(
+            p,
+            document
+                .get_element(basic)
+                .unwrap()
+                .children
+                .last()
+                .unwrap()
+                .as_element()
+                .unwrap()
+        )
+    }
+
+    #[test]
+    fn test_namespace() {
+        let xml = r#"
+        <root xmlns="ns", xmlns:p="pns">
+            <p:foo xmlns="inner">
+                Hello
+            </p:foo>
+            <p:bar xmlns:p="in2">
+                <c />
+                World!
+            </p:bar>
+        </root>"#;
+        let document = Document::from_str(xml).unwrap();
+        let root = document.get_root().get_children()[0].as_element().unwrap();
+        let child_elements = document.get_element(root).unwrap().child_elements();
+        let foo = *child_elements.get(0).unwrap();
+        let bar = *child_elements.get(1).unwrap();
+        let c = document.get_element(bar).unwrap().child_elements()[0];
+        assert_eq!(document.get_namespace(c, "").unwrap(), "ns");
+        assert_eq!(document.get_namespace(c, "p").unwrap(), "in2");
+        assert!(document.get_namespace(c, "random").is_err());
+        assert_eq!(document.get_namespace(bar, "p").unwrap(), "in2");
+        assert_eq!(document.get_namespace(foo, "").unwrap(), "inner");
+        assert_eq!(document.get_namespace(foo, "p").unwrap(), "pns");
+        assert_eq!(document.get_namespace(root, "").unwrap(), "ns");
     }
 }
