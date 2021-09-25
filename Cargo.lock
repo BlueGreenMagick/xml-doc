@@ -362,6 +362,7 @@ name = "quick_xml_tree"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "itertools",
  "minidom",
  "quick-xml 0.22.0",
  "roxmltree",

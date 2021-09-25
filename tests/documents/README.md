@@ -1,3 +1,0 @@
-- basic: Basic xml files. Test tags, attributes, namespaces
-- error1: closing tag without opening tag
-- standalone: Standalone tags that doesn't have closing tags.

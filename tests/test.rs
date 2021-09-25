@@ -1,15 +1,22 @@
-use quick_xml_tree::{Document, ElementId, Node};
+use itertools::Itertools;
+use quick_xml_tree::{Document, ElementId, Node, ReadOptions};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 use std::path::Path;
 
-#[derive(Clone, PartialEq)]
-struct TStr<'a>(pub &'a str);
+#[derive(Clone)]
+struct TStr(pub String);
 
-impl<'a> fmt::Debug for TStr<'a> {
+impl PartialEq<Self> for TStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.trim() == other.0.trim()
+    }
+}
+
+impl<'a> fmt::Debug for TStr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\n{}\n", self.0)
+        write!(f, "\n{}\n", self.0.trim())
     }
 }
 
@@ -78,44 +85,85 @@ fn write_line(text: &str, depth: usize, buf: &mut String) {
     writeln!(buf, "{}{}", indent, text).unwrap();
 }
 
-fn test(file_name: &str) {
-    let path = Path::new("tests/documents").join(file_name);
-    let yaml_file = path.with_extension("yaml");
-    let xml_file = path.with_extension("xml");
-    let expected: String = std::fs::read_to_string(&yaml_file)
-        .unwrap()
-        .lines()
-        .map(|line| line.trim_end())
-        .collect::<Vec<&str>>()
-        .join("\n");
-    let xml_raw_str = std::fs::read_to_string(&xml_file).unwrap();
-    let result = match Document::from_str(&xml_raw_str) {
-        Ok(document) => to_yaml(&document),
-        Err(error) => {
+// main test functions
+//////////////////////
+
+fn get_expected(file_name: &str) -> TStr {
+    let yaml_file = Path::new("tests/documents").join(file_name);
+
+    TStr(
+        std::fs::read_to_string(&yaml_file)
+            .unwrap()
+            .lines()
+            .map(|line| line.trim_end())
+            .collect::<Vec<&str>>()
+            .join("\n"),
+    )
+}
+
+fn test<F, S>(xml_file: &str, expected: F)
+where
+    F: Fn(&ReadOptions) -> S,
+    S: Into<String>,
+{
+    let xml_file = Path::new("tests/documents").join(xml_file);
+    let xml_raw = std::fs::read_to_string(&xml_file).unwrap();
+
+    // Options
+    let standalone_opts = [true, false];
+    let opts = [standalone_opts];
+
+    for k in opts.iter().multi_cartesian_product() {
+        let read_options = ReadOptions { standalone: *k[0] };
+        let expected_name: String = expected(&read_options).into();
+        let expected = get_expected(&expected_name);
+        // Read xml document
+        let mut document = Document::new();
+        document.read_opts = read_options.clone();
+        let result = if let Err(error) = document.read_str(&xml_raw) {
             let debug_str = format!("{:?}", error);
             let variant_name = debug_str.splitn(2, "(").next().unwrap();
-            format!("error: {}", variant_name)
-        }
-    };
-    assert_eq!(TStr(result.trim()), TStr(expected.trim()));
+            TStr(format!("error: {}", variant_name))
+        } else {
+            TStr(to_yaml(&document))
+        };
+
+        assert!(
+            result == expected,
+            "\noptions: {:?}\n===result==={:?}===expected==={:?}\n",
+            read_options,
+            result,
+            expected,
+        );
+    }
+}
+#[test]
+fn basic() {
+    test("basic.xml", |_| "basic.yaml".to_string())
 }
 
-macro_rules! test {
-    ($name:ident) => {
-        #[test]
-        fn $name() {
-            test(stringify!($name));
-        }
-    };
+#[test]
+fn error1() {
+    test("error1.xml", |_| "error1.yaml".to_string())
 }
 
-test!(basic1);
-test!(basic2);
-test!(basic3);
-test!(basic4);
-test!(basic5);
-test!(basic6);
-test!(standalone1);
-test!(standalone2);
-test!(error1);
-test!(error2);
+#[test]
+fn error2() {
+    test("error2.xml", |_| "error2.yaml".to_string())
+}
+
+#[test]
+fn namespace() {
+    test("namespace.xml", |_| "namespace.yaml".to_string())
+}
+
+#[test]
+fn standalone() {
+    test("standalone.xml", |opts| {
+        if opts.standalone == true {
+            "standalone.yaml"
+        } else {
+            "standalone_err.yaml"
+        }
+    })
+}

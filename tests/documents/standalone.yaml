@@ -5,6 +5,8 @@ Root:
         - Element:
             name: br
         - Element:
+            name: tr
+        - Element:
             name: span
             children:
               - Text: "Hello"

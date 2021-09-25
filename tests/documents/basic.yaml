@@ -1,0 +1,14 @@
+Root:
+  - Element:
+      name: root
+      attributes:
+        attr: "value"
+        attr2: "hey"
+      children:
+        - Element:
+            name: self-closing
+        - Text: "Text:"
+        - Element:
+            name: b
+            children:
+              - Text: "Hello World!"

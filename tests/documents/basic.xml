@@ -1,0 +1,5 @@
+<root attr="value" attr2="hey">
+    <self-closing/>
+    Text:
+    <b>Hello World!</b>
+</root>

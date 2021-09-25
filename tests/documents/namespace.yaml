@@ -1,0 +1,19 @@
+Root:
+  - Element:
+      name: root
+      attributes:
+        attr1: "val1"
+        attr2: "val2"
+      namespaces:
+        : "http://example.xml"
+      children:
+        - Element:
+            name: tag2
+            namespaces:
+              : "tag2 namespace"
+              p: "p namespace"
+            children:
+              - Element:
+                  prefix: p
+                  name: a
+        - Text: "Text"

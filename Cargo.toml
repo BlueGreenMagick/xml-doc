@@ -12,6 +12,7 @@ minidom = "0.12"
 roxmltree = "0.14"
 sxd-document = "0.3"
 xmltree = "0.10"
+itertools = "0.10"
 
 [[bench]]
 name = "bench"
