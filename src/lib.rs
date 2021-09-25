@@ -1,7 +1,7 @@
 mod error;
 
 pub use crate::error::{Error, Result};
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -20,6 +20,15 @@ pub type ElementId = usize;
 pub enum Node {
     Element(ElementId),
     Text(String),
+    Comment(String),
+    CData(String),
+    Decl {
+        version: String,
+        encoding: Option<String>,
+        standalone: Option<String>,
+    },
+    PI(String),
+    DocType(String),
 }
 
 impl Node {
@@ -410,13 +419,49 @@ impl Document {
                 }
                 Ok(Event::Text(ev)) => {
                     let node = Node::Text(ev.unescape_and_decode(&reader)?);
-                    let &id = element_stack.last().unwrap();
+                    let id = *element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
+                }
+                Ok(Event::Comment(ev)) => {
+                    let node = Node::Comment(ev.unescape_and_decode(&reader)?);
+                    let id = *element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
+                }
+                Ok(Event::CData(ev)) => {
+                    let node = Node::CData(ev.unescape_and_decode(&reader)?);
+                    let id = *element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
+                }
+                Ok(Event::PI(ev)) => {
+                    let node = Node::PI(ev.unescape_and_decode(&reader)?);
+                    let id = *element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
+                }
+                Ok(Event::DocType(ev)) => {
+                    let node = Node::DocType(ev.unescape_and_decode(&reader)?);
+                    let id = *element_stack.last().unwrap();
+                    self.get_mut_element(id).unwrap().children.push(node);
+                }
+                Ok(Event::Decl(ev)) => {
+                    let version = String::from_utf8_lossy(&ev.version()?).into_owned();
+                    let encoding = match ev.encoding() {
+                        Some(res) => Some(String::from_utf8_lossy(&res?).into_owned()),
+                        None => None,
+                    };
+                    let standalone = match ev.standalone() {
+                        Some(res) => Some(String::from_utf8_lossy(&res?).into_owned()),
+                        None => None,
+                    };
+                    let node = Node::Decl {
+                        version: version,
+                        encoding: encoding,
+                        standalone: standalone,
+                    };
+                    let id = *element_stack.last().unwrap();
                     self.get_mut_element(id).unwrap().children.push(node);
                 }
                 Ok(Event::Eof) => return Ok(()),
                 Err(e) => return Err(Error::from(e)),
-                // TODO!
-                _ => (), // Unimplemented
             }
         }
     }
@@ -436,6 +481,27 @@ impl Document {
                 Node::Text(text) => {
                     writer.write_event(Event::Text(BytesText::from_escaped_str(text)))?
                 }
+                Node::CData(text) => {
+                    writer.write_event(Event::CData(BytesText::from_escaped_str(text)))?
+                }
+                Node::Comment(text) => {
+                    writer.write_event(Event::Comment(BytesText::from_escaped_str(text)))?
+                }
+                Node::DocType(text) => {
+                    writer.write_event(Event::DocType(BytesText::from_escaped_str(text)))?
+                }
+                Node::PI(text) => {
+                    writer.write_event(Event::PI(BytesText::from_escaped_str(text)))?
+                }
+                Node::Decl {
+                    version,
+                    encoding,
+                    standalone,
+                } => writer.write_event(Event::Decl(BytesDecl::new(
+                    version.as_bytes(),
+                    encoding.as_ref().map(|s| s.as_bytes()),
+                    standalone.as_ref().map(|s| s.as_bytes()),
+                )))?,
             };
         }
         Ok(())

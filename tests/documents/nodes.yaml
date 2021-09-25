@@ -1,0 +1,11 @@
+Root:
+  - Decl:
+      version: 1.0
+      encoding: UTF-8
+  - Element:
+      name: el
+  - Text: "Text"
+  - Comment: " Comment "
+  - DocType: " doctype"
+  - CData: "<tag>text</tag>"
+  - PI: "xml-stylesheet type="text/xsl""

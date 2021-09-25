@@ -35,6 +35,24 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
         match node {
             Node::Element(id) => render_element(doc, *id, depth, buf),
             Node::Text(text) => write_line(&format!("- Text: \"{}\"", text), depth, buf),
+            Node::Comment(text) => write_line(&format!("- Comment: \"{}\"", text), depth, buf),
+            Node::CData(text) => write_line(&format!("- CData: \"{}\"", text), depth, buf),
+            Node::DocType(text) => write_line(&format!("- DocType: \"{}\"", text), depth, buf),
+            Node::PI(text) => write_line(&format!("- PI: \"{}\"", text), depth, buf),
+            Node::Decl {
+                version,
+                encoding,
+                standalone,
+            } => {
+                write_line("- Decl:", depth, buf);
+                write_line(&format!("version: {}", version), depth + 2, buf);
+                if let Some(val) = encoding {
+                    write_line(&format!("encoding: {}", val), depth + 2, buf);
+                }
+                if let Some(val) = standalone {
+                    write_line(&format!("encoding: {}", val), depth + 2, buf);
+                }
+            }
         }
     }
 }
@@ -167,6 +185,10 @@ fn error2() {
     test("error2.xml", |_| "error2.yaml".to_string())
 }
 
+#[test]
+fn nodes() {
+    test("nodes.xml", |_| "nodes.yaml".to_string())
+}
 #[test]
 fn namespace() {
     test("namespace.xml", |_| "namespace.yaml".to_string())
