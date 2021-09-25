@@ -55,9 +55,6 @@ impl PartialEq for Element {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
-    fn ne(&self, other: &Self) -> bool {
-        self.id != other.id
-    }
 }
 
 impl Element {
@@ -271,7 +268,7 @@ impl Document {
             }
             id = elem.parent.ok_or(Error::NotFound)?;
         }
-        return Err(Error::NotFound);
+        Err(Error::NotFound)
     }
 }
 
@@ -290,7 +287,7 @@ impl Document {
     }
 
     pub fn read_str(&mut self, str: &str) -> Result<()> {
-        if self.store.get(0).unwrap().children.len() > 0 {
+        if !self.get_root().children.is_empty() {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_str(str);
@@ -299,7 +296,7 @@ impl Document {
     }
 
     pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
-        if self.store.get(0).unwrap().children.len() > 0 {
+        if !self.get_root().children.is_empty() {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_reader(reader);
@@ -314,7 +311,7 @@ impl Document {
         ev: &BytesStart,
     ) -> Result<ElementId> {
         let raw_name = reader.decode(ev.name());
-        let splitted: Vec<&str> = raw_name.splitn(2, ":").collect();
+        let splitted: Vec<&str> = raw_name.splitn(2, ':').collect();
         let (prefix, name) = if splitted.len() > 1 {
             let prefix = splitted[0].to_string();
             let name = splitted[1].to_string();
@@ -327,12 +324,12 @@ impl Document {
         for attr in ev.attributes() {
             let attr = attr?;
             let key = reader.decode(attr.key).to_string();
-            let value = attr.unescape_and_decode_value(&reader)?;
+            let value = attr.unescape_and_decode_value(reader)?;
             if key == "xmlns" {
                 namespaces.insert(String::new(), value);
                 continue;
-            } else if key.starts_with("xmlns:") {
-                namespaces.insert(key[6..].to_owned(), value);
+            } else if let Some(prefix) = key.strip_prefix("xmlns:") {
+                namespaces.insert(prefix.to_owned(), value);
                 continue;
             }
             attributes.insert(key, value);
@@ -368,16 +365,16 @@ impl Document {
                     None => Cow::Borrowed(&last_element.name),
                 };
                 if last_raw_name == raw_name {
-                    if move_children.len() > 0 {
+                    if !move_children.is_empty() {
                         last_element.children.extend(move_children);
-                    } else if opts_empty_text_node && last_element.children.len() == 0 {
+                    } else if opts_empty_text_node && last_element.children.is_empty() {
                         last_element.children.push(Node::Text(String::new()));
                     }
                     break;
                 };
-                if last_element.children.len() > 0 {
+                if !last_element.children.is_empty() {
                     last_element.children.extend(move_children);
-                    move_children = std::mem::replace(&mut last_element.children, Vec::new());
+                    move_children = std::mem::take(&mut last_element.children);
                 }
             }
         } else {
@@ -385,7 +382,7 @@ impl Document {
             if opts_empty_text_node {
                 let elem = self.get_mut_element(elemid).unwrap();
                 // distinguish <tag></tag> and <tag />
-                if elem.children.len() == 0 {
+                if elem.children.is_empty() {
                     elem.children.push(Node::Text(String::new()));
                 }
             }
@@ -451,9 +448,9 @@ impl Document {
                         None => None,
                     };
                     let node = Node::Decl {
-                        version: version,
-                        encoding: encoding,
-                        standalone: standalone,
+                        version,
+                        encoding,
+                        standalone,
                     };
                     let id = *element_stack.last().unwrap();
                     self.get_mut_element(id).unwrap().children.push(node);
@@ -466,13 +463,13 @@ impl Document {
 
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let root = self.get_root();
-        let mut writer = Writer::new_with_indent(writer, ' ' as u8, 4);
+        let mut writer = Writer::new_with_indent(writer, b' ', 4);
         self.write_nodes(&mut writer, &root.children)?;
         writer.write_event(Event::Eof)?;
         Ok(())
     }
 
-    fn write_nodes(&self, writer: &mut Writer<impl Write>, nodes: &Vec<Node>) -> Result<()> {
+    fn write_nodes(&self, writer: &mut Writer<impl Write>, nodes: &[Node]) -> Result<()> {
         for node in nodes {
             match node {
                 Node::Element(eid) => self.write_element(writer, *eid)?,
@@ -517,19 +514,19 @@ impl Document {
             start.push_attribute((key.as_bytes(), val.as_bytes()));
         }
         for (prefix, val) in &elem.namespaces {
-            let attr_name = if prefix.len() == 0 {
+            let attr_name = if prefix.is_empty() {
                 "xmlns".to_string()
             } else {
                 format!("{}:{}", prefix, val)
             };
             start.push_attribute((attr_name.as_bytes(), val.as_bytes()));
         }
-        if elem.children.len() > 0 {
+        if elem.children.is_empty() {
+            writer.write_event(Event::Empty(start))?;
+        } else {
             writer.write_event(Event::Start(start))?;
             self.write_nodes(writer, &elem.children)?;
             writer.write_event(Event::End(BytesEnd::borrowed(name_bytes)))?;
-        } else {
-            writer.write_event(Event::Empty(start))?
         }
         Ok(())
     }
