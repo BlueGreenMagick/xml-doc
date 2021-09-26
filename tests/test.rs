@@ -1,4 +1,4 @@
-use easyxml::{Document, ElementId, Node, ReadOptions};
+use easyxml::{Document, Element, Node, ReadOptions};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt;
@@ -25,7 +25,7 @@ fn to_yaml(document: &Document) -> String {
     let mut depth: usize = 0;
     write_line("Root:", depth, &mut buf);
     depth += 1;
-    let root_node = document.get_element(0).unwrap();
+    let root_node = document.get_root();
     render_nodes(document, root_node.get_children(), depth, &mut buf);
     buf
 }
@@ -57,7 +57,7 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
     }
 }
 
-fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut String) {
+fn render_element(doc: &Document, id: Element, mut depth: usize, buf: &mut String) {
     let elem = doc.get_element(id).unwrap();
     write_line("- Element:", depth, buf);
     depth += 2;

@@ -1,4 +1,4 @@
-use crate::ElementId;
+use crate::Element;
 use quick_xml::Error as XMLError;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -8,7 +8,7 @@ pub enum Error {
     RootCannotMove,
     NotFound,
     IsAnElement,
-    ElementNotExist(ElementId),
+    ElementNotExist(Element),
     MalformedXML(String),
     NotEmpty,
     LazyError(quick_xml::Error),

@@ -1,3 +1,7 @@
+// TODO: calculate the minimum number of methods needed for manipulating tree
+// and other helper methods should depend on that
+// even if the performance takes a little hit.
+
 mod error;
 
 pub use crate::error::{Error, Result};
@@ -28,11 +32,20 @@ impl ReadOptions {
     }
 }
 
-pub type ElementId = usize;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Element {
+    id: usize,
+}
+
+impl Element {
+    fn with_id(id: usize) -> Element {
+        Element { id }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Node {
-    Element(ElementId),
+    Element(Element),
     Text(String),
     Comment(String),
     CData(String),
@@ -46,7 +59,7 @@ pub enum Node {
 }
 
 impl Node {
-    fn as_element(&self) -> Option<ElementId> {
+    fn as_element(&self) -> Option<Element> {
         match self {
             Self::Element(id) => Some(*id),
             _ => None,
@@ -55,16 +68,16 @@ impl Node {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Element {
-    id: ElementId,
+pub struct ElementData {
+    id: Element,
     pub raw_name: String,
     pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
-    parent: Option<ElementId>,
+    parent: Option<Element>,
     children: Vec<Node>,
 }
 
-impl Element {
+impl ElementData {
     pub fn get_prefix_name(&self) -> (&str, &str) {
         match self.raw_name.split_once(":") {
             Some((prefix, name)) => (prefix, name),
@@ -84,7 +97,7 @@ impl Element {
         self.parent != None
     }
 
-    pub fn get_parent(&self) -> Option<ElementId> {
+    pub fn get_parent(&self) -> Option<Element> {
         self.parent
     }
 
@@ -92,7 +105,7 @@ impl Element {
         &self.children
     }
 
-    pub fn child_elements(&self) -> Vec<ElementId> {
+    pub fn child_elements(&self) -> Vec<Element> {
         self.children
             .iter()
             .filter_map(|node| {
@@ -138,13 +151,13 @@ impl Element {
     }
 
     // After calling this method, remove parent from child.
-    fn remove_child_element(&mut self, id: ElementId) {
+    fn remove_child_element(&mut self, elem: Element) {
         let idx = self
             .children
             .iter()
             .position(|node| {
                 if let Node::Element(e) = node {
-                    if *e == id {
+                    if *e == elem {
                         return true;
                     }
                 }
@@ -157,8 +170,8 @@ impl Element {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Document {
-    counter: ElementId, // == self.store.len()
-    store: Vec<Element>,
+    counter: usize, // == self.store.len()
+    store: Vec<ElementData>,
     pub read_opts: ReadOptions,
 }
 
@@ -174,77 +187,80 @@ impl Document {
         doc
     }
 
-    pub fn create_element<S: Into<String>>(&mut self, name: S) -> &mut Element {
+    pub fn create_element<S: Into<String>>(&mut self, name: S) -> &mut ElementData {
         let elemid = self.add_element(None, name.into(), HashMap::new(), HashMap::new());
         self.get_mut_element(elemid).unwrap()
     }
 
     fn add_element(
         &mut self,
-        parent: Option<ElementId>,
+        parent: Option<Element>,
         raw_name: String,
         attributes: HashMap<String, String>,
         namespaces: HashMap<String, String>,
-    ) -> ElementId {
-        let elem = Element {
-            id: self.counter,
+    ) -> Element {
+        let elem = Element::with_id(self.counter);
+        let elem_data = ElementData {
+            id: elem,
             raw_name,
             attributes,
             namespaces,
             parent,
             children: vec![],
         };
-        self.store.push(elem);
+        self.store.push(elem_data);
         self.counter += 1;
-        self.counter - 1
+        elem
     }
 
-    pub fn has_element(&self, id: ElementId) -> bool {
-        self.counter > id
+    pub fn has_element(&self, elem: Element) -> bool {
+        self.counter > elem.id
     }
 
-    pub fn get_element(&self, id: ElementId) -> Result<&Element> {
-        self.store.get(id).ok_or(Error::ElementNotExist(id))
+    pub fn get_element(&self, elem: Element) -> Result<&ElementData> {
+        self.store.get(elem.id).ok_or(Error::ElementNotExist(elem))
     }
 
-    pub fn get_mut_element(&mut self, id: ElementId) -> Result<&mut Element> {
-        self.store.get_mut(id).ok_or(Error::ElementNotExist(id))
+    pub fn get_mut_element(&mut self, elem: Element) -> Result<&mut ElementData> {
+        self.store
+            .get_mut(elem.id)
+            .ok_or(Error::ElementNotExist(elem))
     }
 
-    pub fn get_root(&self) -> &Element {
+    pub fn get_root(&self) -> &ElementData {
         self.store.get(0).expect("Root element is gone!")
     }
 
-    pub fn get_mut_root(&mut self) -> &mut Element {
+    pub fn get_mut_root(&mut self) -> &mut ElementData {
         self.store.get_mut(0).expect("Root element is gone!")
     }
 
-    pub fn remove_from_parent(&mut self, id: ElementId) -> Result<()> {
-        if id == 0 {
+    pub fn remove_from_parent(&mut self, elem: Element) -> Result<()> {
+        if elem.id == 0 {
             return Err(Error::RootCannotMove);
         }
-        let mut elem = self.get_mut_element(id)?;
-        match elem.parent {
+        let mut elem_data = self.get_mut_element(elem)?;
+        match elem_data.parent {
             None => return Ok(()),
             Some(parentid) => {
-                elem.parent = None;
+                elem_data.parent = None;
                 let parent = self.get_mut_element(parentid).unwrap();
-                parent.remove_child_element(id);
+                parent.remove_child_element(elem);
             }
         }
         Ok(())
     }
 
-    pub fn set_parent(&mut self, id: ElementId, new_parentid: ElementId) -> Result<()> {
-        if id == 0 {
+    pub fn set_parent(&mut self, elem: Element, new_parentid: Element) -> Result<()> {
+        if elem.id == 0 {
             return Err(Error::RootCannotMove);
         }
         if !self.has_element(new_parentid) {
             return Err(Error::ElementNotExist(new_parentid));
         }
-        let elem = self.get_element(id)?;
+        let elem_data = self.get_element(elem)?;
 
-        if let Some(parentid) = elem.get_parent() {
+        if let Some(parentid) = elem_data.get_parent() {
             let parent_children = &mut self
                 .get_mut_element(parentid)
                 .expect("Document is inconsistant: Parent element doesn't exist.")
@@ -253,25 +269,24 @@ impl Document {
                 parent_children
                     .iter()
                     .filter_map(|node| node.as_element())
-                    .position(|x| x == id)
+                    .position(|x| x == elem)
                     .expect("Document is inconsistant: Element not found in children"),
             );
         }
-        let elem = self.get_mut_element(id)?;
-        elem.parent = Some(new_parentid);
+        let elem_data = self.get_mut_element(elem)?;
+        elem_data.parent = Some(new_parentid);
         let new_parent_elem = self.get_mut_element(new_parentid)?;
-        new_parent_elem.children.push(Node::Element(id));
+        new_parent_elem.children.push(Node::Element(elem));
         Ok(())
     }
 
-    pub fn get_namespace(&self, id: ElementId, prefix: &str) -> Result<&str> {
-        let mut id = id;
-        while id != 0 {
-            let elem = self.get_element(id)?;
-            if let Some(value) = elem.namespaces.get(prefix) {
+    pub fn get_namespace(&self, mut elem: Element, prefix: &str) -> Result<&str> {
+        while elem.id != 0 {
+            let elem_data = self.get_element(elem)?;
+            if let Some(value) = elem_data.namespaces.get(prefix) {
                 return Ok(value);
             }
-            id = elem.parent.ok_or(Error::NotFound)?;
+            elem = elem_data.parent.ok_or(Error::NotFound)?;
         }
         Err(Error::NotFound)
     }
@@ -312,9 +327,9 @@ impl Document {
     fn read_bytes_start<B: BufRead>(
         &mut self,
         reader: &Reader<B>,
-        element_stack: &Vec<ElementId>,
+        element_stack: &Vec<Element>,
         ev: &BytesStart,
-    ) -> Result<ElementId> {
+    ) -> Result<Element> {
         let raw_name = reader.decode(ev.name()).to_string();
         let mut namespaces = HashMap::new();
         let mut attributes = HashMap::new();
@@ -341,7 +356,7 @@ impl Document {
     fn read_bytes_end<B: BufRead>(
         &mut self,
         reader: &Reader<B>,
-        element_stack: &mut Vec<ElementId>,
+        element_stack: &mut Vec<Element>,
         ev: &BytesEnd,
     ) -> Result<()> {
         let opts_empty_text_node = self.read_opts.empty_text_node;
@@ -389,7 +404,7 @@ impl Document {
         reader.trim_text(true);
 
         let mut buf = Vec::new();
-        let mut element_stack: Vec<ElementId> = vec![0]; // root element in element_stack
+        let mut element_stack: Vec<Element> = vec![Element::with_id(0)]; // root element in element_stack
 
         loop {
             let ev = reader.read_event(&mut buf);
@@ -502,7 +517,7 @@ impl Document {
         Ok(())
     }
 
-    fn write_element(&self, writer: &mut Writer<impl Write>, id: ElementId) -> Result<()> {
+    fn write_element(&self, writer: &mut Writer<impl Write>, id: Element) -> Result<()> {
         let elem = self.get_element(id).unwrap();
         let name_bytes = elem.raw_name.as_bytes();
         let mut start = BytesStart::borrowed_name(name_bytes);
