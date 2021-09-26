@@ -2,8 +2,10 @@
 // and other helper methods should depend on that
 // even if the performance takes a little hit.
 
+mod element;
 mod error;
 
+pub use crate::element::Element;
 pub use crate::error::{Error, Result};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -19,27 +21,14 @@ macro_rules! debug {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
-    pub standalone: bool, // Whether to accept tags that doesn't have closing tags like <br>
     pub empty_text_node: bool, // <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 }
 
 impl ReadOptions {
     pub fn default() -> ReadOptions {
         ReadOptions {
-            standalone: false,
             empty_text_node: true,
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Element {
-    id: usize,
-}
-
-impl Element {
-    fn with_id(id: usize) -> Element {
-        Element { id }
     }
 }
 
@@ -59,7 +48,7 @@ pub enum Node {
 }
 
 impl Node {
-    fn as_element(&self) -> Option<Element> {
+    pub fn as_element(&self) -> Option<Element> {
         match self {
             Self::Element(id) => Some(*id),
             _ => None,
@@ -70,103 +59,14 @@ impl Node {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElementData {
     id: Element,
-    pub raw_name: String,
-    pub attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
-    pub namespaces: HashMap<String, String>, // local namespace newly defined in attributes
+    raw_name: String,
+    attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
+    namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
     parent: Option<Element>,
     children: Vec<Node>,
 }
 
-impl ElementData {
-    pub fn get_prefix_name(&self) -> (&str, &str) {
-        match self.raw_name.split_once(":") {
-            Some((prefix, name)) => (prefix, name),
-            None => ("", &self.raw_name),
-        }
-    }
-
-    pub fn get_name(&self) -> &str {
-        self.get_prefix_name().1
-    }
-
-    pub fn get_prefix(&self) -> &str {
-        self.get_prefix_name().0
-    }
-
-    pub fn has_parent(&self) -> bool {
-        self.parent != None
-    }
-
-    pub fn get_parent(&self) -> Option<Element> {
-        self.parent
-    }
-
-    pub fn get_children(&self) -> &Vec<Node> {
-        &self.children
-    }
-
-    pub fn child_elements(&self) -> Vec<Element> {
-        self.children
-            .iter()
-            .filter_map(|node| {
-                if let Node::Element(elemid) = node {
-                    Some(*elemid)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Insert a non element node to its children.
-    ///
-    /// # Errors
-    /// - Error::IsAnElement if node is an element
-    ///
-    /// # Panics
-    /// Panics if index > self.get_children().len()
-    pub fn insert_child_node(&mut self, index: usize, node: Node) -> Result<()> {
-        if let Node::Element(_) = node {
-            return Err(Error::IsAnElement);
-        }
-        self.children.insert(index, node);
-        Ok(())
-    }
-
-    /// Push a non element node to its children.
-    pub fn push_child_node(&mut self, node: Node) -> Result<()> {
-        if let Node::Element(_) = node {
-            return Err(Error::IsAnElement);
-        }
-        self.children.push(node);
-        Ok(())
-    }
-
-    pub fn remove_child_at(&mut self, index: usize) -> Result<Node> {
-        let node = self.children.get(index).ok_or(Error::NotFound)?;
-        if let Node::Element(_) = node {
-            return Err(Error::IsAnElement);
-        }
-        Ok(self.children.remove(index))
-    }
-
-    // After calling this method, remove parent from child.
-    fn remove_child_element(&mut self, elem: Element) {
-        let idx = self
-            .children
-            .iter()
-            .position(|node| {
-                if let Node::Element(e) = node {
-                    if *e == elem {
-                        return true;
-                    }
-                }
-                false
-            })
-            .unwrap();
-        self.children.remove(idx);
-    }
-}
+impl ElementData {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Document {
@@ -183,112 +83,12 @@ impl Document {
             read_opts: ReadOptions::default(),
         };
         // create root element
-        doc.add_element(None, String::new(), HashMap::new(), HashMap::new());
+        Element::new(&mut doc, String::new());
         doc
     }
 
-    pub fn create_element<S: Into<String>>(&mut self, name: S) -> &mut ElementData {
-        let elemid = self.add_element(None, name.into(), HashMap::new(), HashMap::new());
-        self.get_mut_element(elemid).unwrap()
-    }
-
-    fn add_element(
-        &mut self,
-        parent: Option<Element>,
-        raw_name: String,
-        attributes: HashMap<String, String>,
-        namespaces: HashMap<String, String>,
-    ) -> Element {
-        let elem = Element::with_id(self.counter);
-        let elem_data = ElementData {
-            id: elem,
-            raw_name,
-            attributes,
-            namespaces,
-            parent,
-            children: vec![],
-        };
-        self.store.push(elem_data);
-        self.counter += 1;
-        elem
-    }
-
-    pub fn has_element(&self, elem: Element) -> bool {
-        self.counter > elem.id
-    }
-
-    pub fn get_element(&self, elem: Element) -> Result<&ElementData> {
-        self.store.get(elem.id).ok_or(Error::ElementNotExist(elem))
-    }
-
-    pub fn get_mut_element(&mut self, elem: Element) -> Result<&mut ElementData> {
-        self.store
-            .get_mut(elem.id)
-            .ok_or(Error::ElementNotExist(elem))
-    }
-
-    pub fn get_root(&self) -> &ElementData {
-        self.store.get(0).expect("Root element is gone!")
-    }
-
-    pub fn get_mut_root(&mut self) -> &mut ElementData {
-        self.store.get_mut(0).expect("Root element is gone!")
-    }
-
-    pub fn remove_from_parent(&mut self, elem: Element) -> Result<()> {
-        if elem.id == 0 {
-            return Err(Error::RootCannotMove);
-        }
-        let mut elem_data = self.get_mut_element(elem)?;
-        match elem_data.parent {
-            None => return Ok(()),
-            Some(parentid) => {
-                elem_data.parent = None;
-                let parent = self.get_mut_element(parentid).unwrap();
-                parent.remove_child_element(elem);
-            }
-        }
-        Ok(())
-    }
-
-    pub fn set_parent(&mut self, elem: Element, new_parentid: Element) -> Result<()> {
-        if elem.id == 0 {
-            return Err(Error::RootCannotMove);
-        }
-        if !self.has_element(new_parentid) {
-            return Err(Error::ElementNotExist(new_parentid));
-        }
-        let elem_data = self.get_element(elem)?;
-
-        if let Some(parentid) = elem_data.get_parent() {
-            let parent_children = &mut self
-                .get_mut_element(parentid)
-                .expect("Document is inconsistant: Parent element doesn't exist.")
-                .children;
-            parent_children.remove(
-                parent_children
-                    .iter()
-                    .filter_map(|node| node.as_element())
-                    .position(|x| x == elem)
-                    .expect("Document is inconsistant: Element not found in children"),
-            );
-        }
-        let elem_data = self.get_mut_element(elem)?;
-        elem_data.parent = Some(new_parentid);
-        let new_parent_elem = self.get_mut_element(new_parentid)?;
-        new_parent_elem.children.push(Node::Element(elem));
-        Ok(())
-    }
-
-    pub fn get_namespace(&self, mut elem: Element, prefix: &str) -> Result<&str> {
-        while elem.id != 0 {
-            let elem_data = self.get_element(elem)?;
-            if let Some(value) = elem_data.namespaces.get(prefix) {
-                return Ok(value);
-            }
-            elem = elem_data.parent.ok_or(Error::NotFound)?;
-        }
-        Err(Error::NotFound)
+    pub fn root(&self) -> Element {
+        self.store.get(0).unwrap().id
     }
 }
 
@@ -307,7 +107,7 @@ impl Document {
     }
 
     pub fn read_str(&mut self, str: &str) -> Result<()> {
-        if !self.get_root().children.is_empty() {
+        if self.root().has_children(self) {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_str(str);
@@ -316,7 +116,7 @@ impl Document {
     }
 
     pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
-        if !self.get_root().children.is_empty() {
+        if self.root().has_children(self) {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_reader(reader);
@@ -331,8 +131,9 @@ impl Document {
         ev: &BytesStart,
     ) -> Result<Element> {
         let raw_name = reader.decode(ev.name()).to_string();
+        let element = Element::new(self, raw_name);
         let mut namespaces = HashMap::new();
-        let mut attributes = HashMap::new();
+        let attributes = element.mut_attributes(self);
         for attr in ev.attributes() {
             let attr = attr?;
             let key = reader.decode(attr.key).to_string();
@@ -346,65 +147,17 @@ impl Document {
             }
             attributes.insert(key, value);
         }
-        let parent_id = *element_stack.last().unwrap();
-        let element = self.add_element(Some(parent_id), raw_name, attributes, namespaces);
-        let node = Node::Element(element);
-        self.get_mut_element(parent_id).unwrap().children.push(node);
+        element.mut_namespace_declarations(self).extend(namespaces);
+        let parent = *element_stack.last().unwrap();
+        parent.push_child(self, Node::Element(element)).unwrap();
         Ok(element)
     }
 
-    fn read_bytes_end<B: BufRead>(
-        &mut self,
-        reader: &Reader<B>,
-        element_stack: &mut Vec<Element>,
-        ev: &BytesEnd,
-    ) -> Result<()> {
-        let opts_empty_text_node = self.read_opts.empty_text_node;
-        if self.read_opts.standalone {
-            let raw_name = reader.decode(ev.name());
-            let mut move_children: Vec<Node> = vec![];
-            loop {
-                let last_eid = element_stack.pop().ok_or_else(|| {
-                    Error::MalformedXML(format!(
-                        "Closing tag mismatch: {}, pos: {}",
-                        raw_name,
-                        reader.buffer_position()
-                    ))
-                })?;
-                let last_element = self.get_mut_element(last_eid).unwrap();
-                let last_raw_name: &str = &last_element.raw_name;
-                if last_raw_name == raw_name {
-                    if !move_children.is_empty() {
-                        last_element.children.extend(move_children);
-                    } else if opts_empty_text_node && last_element.children.is_empty() {
-                        last_element.children.push(Node::Text(String::new()));
-                    }
-                    break;
-                };
-                if !last_element.children.is_empty() {
-                    last_element.children.extend(move_children);
-                    move_children = std::mem::take(&mut last_element.children);
-                }
-            }
-        } else {
-            let elemid = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
-            if opts_empty_text_node {
-                let elem = self.get_mut_element(elemid).unwrap();
-                // distinguish <tag></tag> and <tag />
-                if elem.children.is_empty() {
-                    elem.children.push(Node::Text(String::new()));
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        reader.check_end_names(!self.read_opts.standalone);
         reader.trim_text(true);
 
         let mut buf = Vec::new();
-        let mut element_stack: Vec<Element> = vec![Element::with_id(0)]; // root element in element_stack
+        let mut element_stack: Vec<Element> = vec![self.root()]; // root element in element_stack
 
         loop {
             let ev = reader.read_event(&mut buf);
@@ -415,36 +168,42 @@ impl Document {
                     let element = self.read_bytes_start(&reader, &element_stack, ev)?;
                     element_stack.push(element);
                 }
-                Ok(Event::End(ref ev)) => {
-                    self.read_bytes_end(&reader, &mut element_stack, ev)?;
+                Ok(Event::End(_)) => {
+                    let elem = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+                    if self.read_opts.empty_text_node {
+                        // distinguish <tag></tag> and <tag />
+                        if !elem.has_children(self) {
+                            elem.push_child(self, Node::Text(String::new())).unwrap();
+                        }
+                    }
                 }
                 Ok(Event::Empty(ref ev)) => {
                     self.read_bytes_start(&reader, &element_stack, ev)?;
                 }
                 Ok(Event::Text(ev)) => {
                     let node = Node::Text(ev.unescape_and_decode(&reader)?);
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::Comment(ev)) => {
                     let node = Node::Comment(ev.unescape_and_decode(&reader)?);
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::CData(ev)) => {
                     let node = Node::CData(ev.unescape_and_decode(&reader)?);
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::PI(ev)) => {
                     let node = Node::PI(ev.unescape_and_decode(&reader)?);
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::DocType(ev)) => {
                     let node = Node::DocType(ev.unescape_and_decode(&reader)?);
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::Decl(ev)) => {
                     let version = String::from_utf8_lossy(&ev.version()?).into_owned();
@@ -461,8 +220,8 @@ impl Document {
                         encoding,
                         standalone,
                     };
-                    let id = *element_stack.last().unwrap();
-                    self.get_mut_element(id).unwrap().children.push(node);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::Eof) => return Ok(()),
                 Err(e) => return Err(Error::from(e)),
@@ -477,9 +236,9 @@ impl Document {
     }
 
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
-        let root = self.get_root();
+        let root = self.root();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);
-        self.write_nodes(&mut writer, &root.children)?;
+        self.write_nodes(&mut writer, root.children(self))?;
         writer.write_event(Event::Eof)?;
         Ok(())
     }
@@ -517,14 +276,13 @@ impl Document {
         Ok(())
     }
 
-    fn write_element(&self, writer: &mut Writer<impl Write>, id: Element) -> Result<()> {
-        let elem = self.get_element(id).unwrap();
-        let name_bytes = elem.raw_name.as_bytes();
+    fn write_element(&self, writer: &mut Writer<impl Write>, element: Element) -> Result<()> {
+        let name_bytes = element.raw_name(self).as_bytes();
         let mut start = BytesStart::borrowed_name(name_bytes);
-        for (key, val) in &elem.attributes {
+        for (key, val) in element.attributes(self) {
             start.push_attribute((key.as_bytes(), val.as_bytes()));
         }
-        for (prefix, val) in &elem.namespaces {
+        for (prefix, val) in element.namespace_declarations(self) {
             let attr_name = if prefix.is_empty() {
                 "xmlns".to_string()
             } else {
@@ -532,12 +290,12 @@ impl Document {
             };
             start.push_attribute((attr_name.as_bytes(), val.as_bytes()));
         }
-        if elem.children.is_empty() {
-            writer.write_event(Event::Empty(start))?;
-        } else {
+        if element.has_children(self) {
             writer.write_event(Event::Start(start))?;
-            self.write_nodes(writer, &elem.children)?;
+            self.write_nodes(writer, element.children(self))?;
             writer.write_event(Event::End(BytesEnd::borrowed(name_bytes)))?;
+        } else {
+            writer.write_event(Event::Empty(start))?;
         }
         Ok(())
     }
@@ -556,16 +314,14 @@ mod tests {
         </basic>
         "#;
         let mut document = Document::from_str(xml).unwrap();
-        let basic = document.get_root().get_children()[0].as_element().unwrap();
-        let p = document.create_element("p").id;
-        document.set_parent(p, basic).unwrap();
-        assert_eq!(document.get_element(p).unwrap().parent.unwrap(), basic);
+        let basic = document.root().children(&document)[0].as_element().unwrap();
+        let p = Element::new(&mut document, "p");
+        basic.push_child(&mut document, Node::Element(p)).unwrap();
+        assert_eq!(p.parent(&document).unwrap(), basic);
         assert_eq!(
             p,
-            document
-                .get_element(basic)
-                .unwrap()
-                .children
+            basic
+                .children(&document)
                 .last()
                 .unwrap()
                 .as_element()
@@ -585,24 +341,24 @@ mod tests {
                 World!
             </p:bar>
         </root>"#;
-        let document = Document::from_str(xml).unwrap();
-        let root = document.get_root().get_children()[0].as_element().unwrap();
-        let child_elements = document.get_element(root).unwrap().child_elements();
+        let doc = Document::from_str(xml).unwrap();
+        let root = doc.root().children(&doc)[0].as_element().unwrap();
+        let child_elements = root.child_elements(&doc);
         let foo = *child_elements.get(0).unwrap();
         let bar = *child_elements.get(1).unwrap();
-        let bar_elem = document.get_element(bar).unwrap();
-        let c = bar_elem.child_elements()[0];
-        let c_elem = document.get_element(c).unwrap();
-        assert_eq!(c_elem.get_prefix_name(), ("", "c"));
-        assert_eq!(bar_elem.raw_name, "p:bar");
-        assert_eq!(bar_elem.get_prefix(), "p");
-        assert_eq!(bar_elem.get_name(), "bar");
-        assert_eq!(document.get_namespace(c, "").unwrap(), "ns");
-        assert_eq!(document.get_namespace(c, "p").unwrap(), "in2");
-        assert!(document.get_namespace(c, "random").is_err());
-        assert_eq!(document.get_namespace(bar, "p").unwrap(), "in2");
-        assert_eq!(document.get_namespace(foo, "").unwrap(), "inner");
-        assert_eq!(document.get_namespace(foo, "p").unwrap(), "pns");
-        assert_eq!(document.get_namespace(root, "").unwrap(), "ns");
+        let c = bar.child_elements(&doc)[0];
+        assert_eq!(c.prefix_name(&doc), ("", "c"));
+        assert_eq!(bar.raw_name(&doc), "p:bar");
+        assert_eq!(bar.prefix(&doc), "p");
+        assert_eq!(bar.name(&doc), "bar");
+        assert_eq!(c.namespace(&doc).unwrap(), "ns");
+        assert_eq!(c.namespace_for_prefix(&doc, "p").unwrap(), "in2");
+        assert!(c.namespace_for_prefix(&doc, "random").is_none());
+        assert_eq!(bar.namespace(&doc).unwrap(), "in2");
+        assert_eq!(bar.namespace_for_prefix(&doc, "").unwrap(), "ns");
+        assert_eq!(foo.namespace(&doc).unwrap(), "pns");
+        assert_eq!(foo.namespace_for_prefix(&doc, "").unwrap(), "inner");
+        assert_eq!(foo.namespace_for_prefix(&doc, "p").unwrap(), "pns");
+        assert_eq!(root.namespace(&doc).unwrap(), "ns");
     }
 }

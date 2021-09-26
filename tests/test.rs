@@ -25,8 +25,8 @@ fn to_yaml(document: &Document) -> String {
     let mut depth: usize = 0;
     write_line("Root:", depth, &mut buf);
     depth += 1;
-    let root_node = document.get_root();
-    render_nodes(document, root_node.get_children(), depth, &mut buf);
+    let root = document.root();
+    render_nodes(document, root.children(&document), depth, &mut buf);
     buf
 }
 
@@ -57,26 +57,25 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
     }
 }
 
-fn render_element(doc: &Document, id: Element, mut depth: usize, buf: &mut String) {
-    let elem = doc.get_element(id).unwrap();
+fn render_element(doc: &Document, elem: Element, mut depth: usize, buf: &mut String) {
     write_line("- Element:", depth, buf);
     depth += 2;
 
-    let name = &elem.raw_name;
+    let name = elem.raw_name(doc);
     write_line(&format!("name: {}", name), depth, buf);
 
-    let attrs = &elem.attributes;
+    let attrs = elem.attributes(doc);
     if attrs.len() > 0 {
         write_line("attributes:", depth, buf);
         write_hashmap_alphabetical(attrs, depth, buf);
     }
 
-    let namespaces = &elem.namespaces;
+    let namespaces = elem.namespace_declarations(doc);
     if namespaces.len() > 0 {
         write_line("namespaces:", depth, buf);
         write_hashmap_alphabetical(namespaces, depth, buf);
     }
-    let children = elem.get_children();
+    let children = elem.children(doc);
     if children.len() > 0 {
         write_line("children:", depth, buf);
         depth += 1;
@@ -141,14 +140,12 @@ where
     let xml_raw = std::fs::read_to_string(&xml_file).unwrap();
 
     // Options
-    let standalone_opts = [true, false];
     let empty_text_node_opts = [true, false];
-    let opts = [standalone_opts, empty_text_node_opts];
+    let opts = [empty_text_node_opts];
 
     for k in opts.iter().multi_cartesian_product() {
         let read_options = ReadOptions {
-            standalone: *k[0],
-            empty_text_node: *k[1],
+            empty_text_node: *k[0],
         };
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);
@@ -209,11 +206,5 @@ fn namespace() {
 
 #[test]
 fn standalone() {
-    test("standalone.xml", |opts| {
-        if opts.standalone == true {
-            "standalone.yaml"
-        } else {
-            "standalone_err.yaml"
-        }
-    })
+    test("standalone.xml", |_| "standalone_err.yaml".to_string())
 }

@@ -11,6 +11,7 @@ pub enum Error {
     ElementNotExist(Element),
     MalformedXML(String),
     NotEmpty,
+    HasAParent,
     LazyError(quick_xml::Error),
 }
 
