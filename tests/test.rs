@@ -23,10 +23,9 @@ impl<'a> fmt::Debug for TStr {
 fn to_yaml(document: &Document) -> String {
     let mut buf = String::new();
     let mut depth: usize = 0;
-    write_line("Root:", depth, &mut buf);
+    write_line("Document:", depth, &mut buf);
     depth += 1;
-    let root = document.root();
-    render_nodes(document, root.children(&document), depth, &mut buf);
+    render_nodes(document, document.nodes(), depth, &mut buf);
     buf
 }
 
@@ -124,7 +123,7 @@ fn test_write(document: &Document) -> TStr {
     let result = TStr(to_yaml(&new_doc));
     assert!(
         expected == result,
-        "\n===expected==={:?}\n===result==={:?}\n",
+        "===expected==={:?}\n===result==={:?}\nWRITING\n",
         expected,
         result,
     );
@@ -161,11 +160,11 @@ where
         };
 
         assert!(
-            result == expected,
-            "\noptions: {:?}\n===result==={:?}===expected==={:?}\n",
+            expected == result,
+            "\noptions: {:?}\n===expected==={:?}===result==={:?}\nREADING\n",
             read_options,
-            result,
             expected,
+            result,
         );
     }
 }

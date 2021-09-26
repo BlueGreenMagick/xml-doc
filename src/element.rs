@@ -22,7 +22,6 @@ impl Element {
             id: document.counter,
         };
         let elem_data = ElementData {
-            id: elem,
             raw_name,
             attributes,
             namespace_decls,
@@ -32,10 +31,6 @@ impl Element {
         document.store.push(elem_data);
         document.counter += 1;
         elem
-    }
-
-    pub fn is_root(&self) -> bool {
-        self.id == 0
     }
 }
 
@@ -105,14 +100,13 @@ impl Element {
         prefix: &str,
     ) -> Option<&'a str> {
         let mut elem = *self;
-        while !elem.is_root() {
+        loop {
             let data = elem.data(document);
             if let Some(value) = data.namespace_decls.get(prefix) {
                 return Some(value);
             }
             elem = elem.parent(document)?;
         }
-        None
     }
 
     pub fn parent(&self, document: &Document) -> Option<Element> {
@@ -146,9 +140,6 @@ impl Element {
 
     pub fn push_child(&self, document: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
-            if elem.is_root() {
-                return Err(Error::RootCannotMove);
-            }
             let data = elem.mut_data(document);
             if data.parent.is_some() {
                 return Err(Error::HasAParent);
@@ -162,9 +153,6 @@ impl Element {
     // if node is an element, the element must not have a parent.
     pub fn insert_child(&self, document: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
-            if elem.is_root() {
-                return Err(Error::RootCannotMove);
-            }
             let data = elem.mut_data(document);
             if data.parent.is_some() {
                 return Err(Error::HasAParent);
@@ -197,15 +185,10 @@ impl Element {
         Ok(())
     }
 
-    pub fn detatch_from_parent(&self, document: &mut Document) -> Result<()> {
-        if self.is_root() {
-            return Err(Error::RootCannotMove);
-        }
+    pub fn detatch_from_parent(&self, document: &mut Document) {
         let parent = self.data(document).parent;
         if let Some(parent) = parent {
-            parent.remove_child_elem(document, *self)
-        } else {
-            Ok(())
+            parent.remove_child_elem(document, *self).unwrap();
         }
     }
 }
