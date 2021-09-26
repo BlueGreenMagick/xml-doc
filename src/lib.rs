@@ -13,9 +13,24 @@ macro_rules! debug {
     };
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadOptions {
+    pub standalone: bool, // Whether to accept tags that doesn't have closing tags like <br>
+    pub empty_text_node: bool, // <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+}
+
+impl ReadOptions {
+    pub fn default() -> ReadOptions {
+        ReadOptions {
+            standalone: false,
+            empty_text_node: true,
+        }
+    }
+}
+
 pub type ElementId = usize;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Node {
     Element(ElementId),
     Text(String),
@@ -39,7 +54,7 @@ impl Node {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Element {
     id: ElementId,
     pub raw_name: String,
@@ -49,19 +64,11 @@ pub struct Element {
     children: Vec<Node>,
 }
 
-impl PartialEq for Element {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
 impl Element {
     pub fn get_prefix_name(&self) -> (&str, &str) {
-        let splitted: Vec<&str> = self.raw_name.splitn(2, ':').collect();
-        if splitted.len() == 1 {
-            ("", splitted[0])
-        } else {
-            (splitted[0], splitted[1])
+        match self.raw_name.split_once(":") {
+            Some((prefix, name)) => (prefix, name),
+            None => ("", &self.raw_name),
         }
     }
 
@@ -148,22 +155,7 @@ impl Element {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ReadOptions {
-    pub standalone: bool, // Whether to accept tags that doesn't have closing tags like <br>
-    pub empty_text_node: bool, // <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
-}
-
-impl ReadOptions {
-    pub fn default() -> ReadOptions {
-        ReadOptions {
-            standalone: false,
-            empty_text_node: true,
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Document {
     counter: ElementId, // == self.store.len()
     store: Vec<Element>,
@@ -463,6 +455,12 @@ impl Document {
         }
     }
 
+    pub fn write_str(&self) -> Result<String> {
+        let mut buf: Vec<u8> = Vec::new();
+        self.write(&mut buf)?;
+        Ok(String::from_utf8(buf).unwrap())
+    }
+
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let root = self.get_root();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);
@@ -515,7 +513,7 @@ impl Document {
             let attr_name = if prefix.is_empty() {
                 "xmlns".to_string()
             } else {
-                format!("{}:{}", prefix, val)
+                format!("xmlns:{}", prefix)
             };
             start.push_attribute((attr_name.as_bytes(), val.as_bytes()));
         }

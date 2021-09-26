@@ -87,9 +87,9 @@ fn render_element(doc: &Document, id: ElementId, mut depth: usize, buf: &mut Str
 fn write_hashmap_alphabetical(map: &HashMap<String, String>, depth: usize, buf: &mut String) {
     let mut entries = Vec::new();
     for (key, val) in map.iter() {
-        entries.push((key.clone(), val.clone()))
+        entries.push((key, val))
     }
-    entries.sort_by_cached_key(|x| x.0.clone());
+    entries.sort_by_key(|x| x.0);
     for entry in entries {
         write_line(&format!("{}: \"{}\"", entry.0, entry.1), depth + 1, buf);
     }
@@ -114,6 +114,22 @@ fn get_expected(file_name: &str) -> TStr {
             .collect::<Vec<&str>>()
             .join("\n"),
     )
+}
+
+// Documents and xml files are supposed to have a 1:1 relationship.
+// Then write is ok if read function is ok, and read(write(D)) == D
+fn test_write(document: &Document) -> TStr {
+    let expected = TStr(to_yaml(&document));
+    let written_xml = document.write_str().unwrap();
+    let new_doc = Document::from_str(&written_xml).unwrap();
+    let result = TStr(to_yaml(&new_doc));
+    assert!(
+        expected == result,
+        "\n===expected==={:?}\n===result==={:?}\n",
+        expected,
+        result,
+    );
+    expected
 }
 
 fn test<F, S>(xml_file: &str, expected: F)
@@ -144,7 +160,7 @@ where
             let variant_name = debug_str.splitn(2, "(").next().unwrap();
             TStr(format!("error: {}", variant_name))
         } else {
-            TStr(to_yaml(&document))
+            test_write(&document)
         };
 
         assert!(
