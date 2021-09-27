@@ -61,7 +61,7 @@ fn render_element(doc: &Document, elem: Element, mut depth: usize, buf: &mut Str
     write_line("- Element:", depth, buf);
     depth += 2;
 
-    let name = elem.raw_name(doc);
+    let name = elem.full_name(doc);
     write_line(&format!("name: {}", name), depth, buf);
 
     let attrs = elem.attributes(doc);

@@ -130,8 +130,8 @@ impl Document {
         element_stack: &Vec<Element>,
         ev: &BytesStart,
     ) -> Result<Element> {
-        let raw_name = reader.decode(ev.name()).to_string();
-        let element = Element::new(self, raw_name);
+        let full_name = reader.decode(ev.name()).to_string();
+        let element = Element::new(self, full_name);
         let mut namespaces = HashMap::new();
         let attributes = element.mut_attributes(self);
         for attr in ev.attributes() {
@@ -278,7 +278,7 @@ impl Document {
     }
 
     fn write_element(&self, writer: &mut Writer<impl Write>, element: Element) -> Result<()> {
-        let name_bytes = element.raw_name(self).as_bytes();
+        let name_bytes = element.full_name(self).as_bytes();
         let mut start = BytesStart::borrowed_name(name_bytes);
         for (key, val) in element.attributes(self) {
             start.push_attribute((key.as_bytes(), val.as_bytes()));

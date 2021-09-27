@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// Represents a XML document.
 #[derive(Debug)]
 pub struct ElementData {
-    raw_name: String,
+    full_name: String,
     attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
     parent: Option<Element>,
@@ -32,7 +32,7 @@ impl Element {
 
     pub(crate) fn with_data(
         document: &mut Document,
-        raw_name: String,
+        full_name: String,
         attributes: HashMap<String, String>,
         namespace_decls: HashMap<String, String>,
     ) -> Element {
@@ -40,7 +40,7 @@ impl Element {
             id: document.counter,
         };
         let elem_data = ElementData {
-            raw_name,
+            full_name,
             attributes,
             namespace_decls,
             parent: None,
@@ -53,7 +53,7 @@ impl Element {
 
     pub(crate) fn root() -> (Element, ElementData) {
         let elem_data = ElementData {
-            raw_name: String::new(),
+            full_name: String::new(),
             attributes: HashMap::new(),
             namespace_decls: HashMap::new(),
             parent: None,
@@ -67,10 +67,10 @@ impl Element {
         self.id == 0
     }
 
-    pub fn seperate_prefix_name<'a>(raw_name: &'a str) -> (&'a str, &'a str) {
-        match raw_name.split_once(":") {
+    pub fn seperate_prefix_name<'a>(full_name: &'a str) -> (&'a str, &'a str) {
+        match full_name.split_once(":") {
             Some((prefix, name)) => (prefix, name),
-            None => ("", &raw_name),
+            None => ("", &full_name),
         }
     }
 }
@@ -85,16 +85,15 @@ impl Element {
     }
 
     /// Get raw name of element, including its namespace prefix.
-    pub fn raw_name<'a>(&self, document: &'a Document) -> &'a str {
-        &self.data(document).raw_name
+    pub fn full_name<'a>(&self, document: &'a Document) -> &'a str {
+        &self.data(document).full_name
     }
 
     /// Get prefix and name of element.
     ///
     /// `<prefix: name` -> `("prefix", "name")`
     pub fn prefix_name<'a>(&self, document: &'a Document) -> (&'a str, &'a str) {
-        let data = self.data(document);
-        Self::seperate_prefix_name(&data.raw_name)
+        Self::seperate_prefix_name(self.full_name(document))
     }
 
     /// Get namespace prefix of element, without name.
@@ -375,7 +374,7 @@ mod tests {
         let bar = *child_elements.get(1).unwrap();
         let c = bar.child_elements(&doc)[0];
         assert_eq!(c.prefix_name(&doc), ("", "c"));
-        assert_eq!(bar.raw_name(&doc), "p:bar");
+        assert_eq!(bar.full_name(&doc), "p:bar");
         assert_eq!(bar.prefix(&doc), "p");
         assert_eq!(bar.name(&doc), "bar");
         assert_eq!(c.namespace(&doc).unwrap(), "ns");
