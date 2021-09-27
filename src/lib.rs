@@ -1,7 +1,3 @@
-// TODO: calculate the minimum number of methods needed for manipulating tree
-// and other helper methods should depend on that
-// even if the performance takes a little hit.
-
 mod element;
 mod error;
 
@@ -56,6 +52,7 @@ impl Node {
     }
 }
 
+/// Represents a XML document.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElementData {
     raw_name: String,
@@ -99,6 +96,7 @@ impl Document {
 
 // Read and write
 impl Document {
+    /// Create [`Document`] from xml string.
     pub fn from_str(str: &str) -> Result<Document> {
         let mut document = Document::new();
         document.read_str(str)?;
@@ -110,7 +108,11 @@ impl Document {
         document.read_reader(reader)?;
         Ok(document)
     }
-
+    /// Parses xml string.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
     pub fn read_str(&mut self, str: &str) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
@@ -120,6 +122,11 @@ impl Document {
         Ok(())
     }
 
+    /// Parses xml string from reader.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
     pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
@@ -234,6 +241,7 @@ impl Document {
         }
     }
 
+    /// Writes document as xml string.
     pub fn write_str(&self) -> Result<String> {
         let mut buf: Vec<u8> = Vec::new();
         self.write(&mut buf)?;
