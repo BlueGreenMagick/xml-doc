@@ -124,7 +124,7 @@ fn test_write(document: &Document) -> TStr {
     let result = TStr(to_yaml(&new_doc));
     assert!(
         expected == result,
-        "\n===expected==={:?}\n===result==={:?}\n",
+        "\n===expected==={:?}\n===result==={:?}\nWRITING\n",
         expected,
         result,
     );
@@ -161,11 +161,11 @@ where
         };
 
         assert!(
-            result == expected,
-            "\noptions: {:?}\n===result==={:?}===expected==={:?}\n",
+            expected == result,
+            "\noptions: {:?}\n===expected==={:?}===result==={:?}\nREADING\n",
             read_options,
-            result,
             expected,
+            result,
         );
     }
 }
