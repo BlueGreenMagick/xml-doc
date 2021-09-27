@@ -34,11 +34,6 @@ pub enum Node {
     Text(String),
     Comment(String),
     CData(String),
-    Decl {
-        version: String,
-        encoding: Option<String>,
-        standalone: Option<String>,
-    },
     PI(String),
     DocType(String),
 }
@@ -51,13 +46,16 @@ impl Node {
         }
     }
 }
-
 #[derive(Debug)]
 pub struct Document {
     pub read_opts: ReadOptions,
     counter: usize, // == self.store.len()
     store: Vec<ElementData>,
     root: Element,
+
+    version: String,
+    encoding: Option<String>,
+    standalone: bool,
 }
 
 impl Document {
@@ -68,6 +66,9 @@ impl Document {
             counter: 1, // because root is id 0
             store: vec![root_data],
             root,
+            version: String::new(), // will be changed later
+            encoding: None,
+            standalone: false,
         };
         // create root element
         doc
@@ -121,6 +122,40 @@ impl Document {
         }
         let reader = Reader::from_reader(reader);
         self.read(reader)?;
+        Ok(())
+    }
+
+    fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
+        fn strip_quote<'a>(bytes: &'a [u8]) -> Result<&'a str> {
+            let b = bytes[0];
+            if b != b'"' && b == b'\'' {
+                return Err(Error::MalformedXML(
+                    "Attribute value without quotes".to_string(),
+                ));
+            }
+            let inner = &bytes[1..bytes.len()];
+            Ok(std::str::from_utf8(inner)?)
+        }
+        self.version = strip_quote(&ev.version()?)?.to_string();
+        self.encoding = match ev.encoding() {
+            Some(res) => Some(strip_quote(&res?)?.to_string()),
+            None => None,
+        };
+        self.standalone = match ev.standalone() {
+            Some(res) => {
+                let val = strip_quote(&res?)?.to_lowercase();
+                if val == "yes" {
+                    true
+                } else if val == "no" {
+                    false
+                } else {
+                    return Err(Error::MalformedXML(
+                        "Standalone Document Declaration has non boolean value".to_string(),
+                    ));
+                }
+            }
+            None => false,
+        };
         Ok(())
     }
 
@@ -211,22 +246,7 @@ impl Document {
                     elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::Decl(ev)) => {
-                    let version = String::from_utf8_lossy(&ev.version()?).into_owned();
-                    let encoding = match ev.encoding() {
-                        Some(res) => Some(String::from_utf8_lossy(&res?).into_owned()),
-                        None => None,
-                    };
-                    let standalone = match ev.standalone() {
-                        Some(res) => Some(String::from_utf8_lossy(&res?).into_owned()),
-                        None => None,
-                    };
-                    let node = Node::Decl {
-                        version,
-                        encoding,
-                        standalone,
-                    };
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
+                    self.handle_decl(&ev)?;
                 }
                 Ok(Event::Eof) => return Ok(()),
                 Err(e) => return Err(Error::from(e)),
@@ -244,8 +264,22 @@ impl Document {
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let root = self.root();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);
+        self.write_decl(&mut writer)?;
         self.write_nodes(&mut writer, root.children(self))?;
         writer.write_event(Event::Eof)?;
+        Ok(())
+    }
+
+    fn write_decl(&self, writer: &mut Writer<impl Write>) -> Result<()> {
+        let standalone = match self.standalone {
+            true => Some("yes".as_bytes()),
+            false => None,
+        };
+        writer.write_event(Event::Decl(BytesDecl::new(
+            self.version.as_bytes(),
+            self.encoding.as_ref().map(|s| s.as_bytes()),
+            standalone,
+        )))?;
         Ok(())
     }
 
@@ -269,15 +303,6 @@ impl Document {
                 Node::PI(text) => {
                     writer.write_event(Event::PI(BytesText::from_escaped_str(text)))?
                 }
-                Node::Decl {
-                    version,
-                    encoding,
-                    standalone,
-                } => writer.write_event(Event::Decl(BytesDecl::new(
-                    version.as_bytes(),
-                    encoding.as_ref().map(|s| s.as_bytes()),
-                    standalone.as_ref().map(|s| s.as_bytes()),
-                )))?,
             };
         }
         Ok(())

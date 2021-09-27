@@ -41,22 +41,6 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
             Node::CData(text) => write_line(&format!("- CData: \"{}\"", text), depth, buf),
             Node::DocType(text) => write_line(&format!("- DocType: \"{}\"", text), depth, buf),
             Node::PI(text) => write_line(&format!("- PI: \"{}\"", text), depth, buf),
-            Node::Decl {
-                version,
-                encoding,
-                standalone,
-            } => {
-                write_line("- Decl:", depth, buf);
-                write_line(&format!("version: {}", version), depth + 2, buf);
-                /* Don't print encoding as this library can only write in UTF-8.
-                if let Some(val) = encoding {
-                    write_line(&format!("encoding: {}", val), depth + 2, buf);
-                }
-                */
-                if let Some(val) = standalone {
-                    write_line(&format!("standalone: {}", val), depth + 2, buf);
-                }
-            }
         }
     }
 }

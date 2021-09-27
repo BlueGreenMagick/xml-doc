@@ -78,4 +78,4 @@ criterion_group!(
 criterion_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
 criterion_group!(xml_dom, tiny_xml_dom, medium_xml_dom);
 
-criterion_main!(xml_dom);
+criterion_main!(easyxml);
