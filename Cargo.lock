@@ -185,6 +185,7 @@ name = "easyxml"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "encoding_rs",
  "itertools",
  "minidom",
  "quick-xml 0.22.0",
@@ -376,7 +377,6 @@ version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
 dependencies = [
- "encoding_rs",
  "memchr",
 ]
 

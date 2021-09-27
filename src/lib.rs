@@ -124,20 +124,19 @@ impl Document {
         Ok(())
     }
 
-    fn handle_bytes_start<B: BufRead>(
+    fn handle_bytes_start(
         &mut self,
-        reader: &Reader<B>,
         element_stack: &Vec<Element>,
         ev: &BytesStart,
     ) -> Result<Element> {
-        let full_name = reader.decode(ev.name()).to_string();
+        let full_name = String::from_utf8(ev.name().to_vec())?;
         let element = Element::new(self, full_name);
         let mut namespaces = HashMap::new();
         let attributes = element.mut_attributes(self);
         for attr in ev.attributes() {
             let attr = attr?;
-            let key = reader.decode(attr.key).to_string();
-            let value = attr.unescape_and_decode_value(reader)?;
+            let key = String::from_utf8(attr.key.to_vec())?;
+            let value = String::from_utf8(attr.unescaped_value()?.to_vec())?;
             if key == "xmlns" {
                 namespaces.insert(String::new(), value);
                 continue;
@@ -165,7 +164,7 @@ impl Document {
             debug!(ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
-                    let element = self.handle_bytes_start(&reader, &element_stack, ev)?;
+                    let element = self.handle_bytes_start(&element_stack, ev)?;
                     element_stack.push(element);
                 }
                 Ok(Event::End(_)) => {
@@ -178,30 +177,36 @@ impl Document {
                     }
                 }
                 Ok(Event::Empty(ref ev)) => {
-                    self.handle_bytes_start(&reader, &element_stack, ev)?;
+                    self.handle_bytes_start(&element_stack, ev)?;
                 }
                 Ok(Event::Text(ev)) => {
-                    let node = Node::Text(ev.unescape_and_decode(&reader)?);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::Comment(ev)) => {
-                    let node = Node::Comment(ev.unescape_and_decode(&reader)?);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::CData(ev)) => {
-                    let node = Node::CData(ev.unescape_and_decode(&reader)?);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::PI(ev)) => {
-                    let node = Node::PI(ev.unescape_and_decode(&reader)?);
+                    let content = String::from_utf8(ev.to_vec())?;
+                    let node = Node::Text(content);
                     let elem = *element_stack.last().unwrap();
                     elem.push_child(self, node).unwrap();
                 }
                 Ok(Event::DocType(ev)) => {
-                    let node = Node::DocType(ev.unescape_and_decode(&reader)?);
+                    let content = String::from_utf8(ev.to_vec())?;
+                    let node = Node::DocType(content);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
+                }
+                // Comment, CData, and PI content is not escaped.
+                Ok(Event::Comment(ev)) => {
+                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                    let node = Node::Comment(content);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
+                }
+                Ok(Event::CData(ev)) => {
+                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                    let node = Node::CData(content);
+                    let elem = *element_stack.last().unwrap();
+                    elem.push_child(self, node).unwrap();
+                }
+                Ok(Event::PI(ev)) => {
+                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                    let node = Node::PI(content);
                     let elem = *element_stack.last().unwrap();
                     elem.push_child(self, node).unwrap();
                 }
@@ -249,16 +254,17 @@ impl Document {
             match node {
                 Node::Element(eid) => self.write_element(writer, *eid)?,
                 Node::Text(text) => {
-                    writer.write_event(Event::Text(BytesText::from_escaped_str(text)))?
+                    writer.write_event(Event::Text(BytesText::from_plain_str(text)))?
                 }
-                Node::CData(text) => {
-                    writer.write_event(Event::CData(BytesText::from_escaped_str(text)))?
+                Node::DocType(text) => {
+                    writer.write_event(Event::DocType(BytesText::from_plain_str(text)))?
                 }
+                // Comment, CData, and PI content is not escaped.
                 Node::Comment(text) => {
                     writer.write_event(Event::Comment(BytesText::from_escaped_str(text)))?
                 }
-                Node::DocType(text) => {
-                    writer.write_event(Event::DocType(BytesText::from_escaped_str(text)))?
+                Node::CData(text) => {
+                    writer.write_event(Event::CData(BytesText::from_escaped_str(text)))?
                 }
                 Node::PI(text) => {
                     writer.write_event(Event::PI(BytesText::from_escaped_str(text)))?

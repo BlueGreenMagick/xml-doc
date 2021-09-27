@@ -1,3 +1,5 @@
+use std::string::FromUtf8Error;
+
 use crate::Element;
 use quick_xml::Error as XMLError;
 
@@ -24,5 +26,11 @@ impl From<XMLError> for Error {
             )),
             _ => Error::LazyError(err),
         }
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Error {
+        Error::MalformedXML("Not a valid utf-8".to_string())
     }
 }
