@@ -39,10 +39,15 @@ bench!(
 );
 bench!("large.xml", large_sdx_document, sxd_document::parser::parse);
 
+bench!("tiny.xml", tiny_xml_dom, xml_dom::parser::read_xml);
+bench!("medium.xml", medium_xml_dom, xml_dom::parser::read_xml);
+// Does not manage to read the file.
+// bench!("large.xml", large_xml_dom, xml_dom::parser::read_xml);
+
 criterion_group! {
     name = tiny;
     config = Criterion::default().sample_size(200);
-    targets = tiny_easyxml, tiny_minidom, tiny_roxmltree, tiny_xmltree, tiny_sdx_document
+    targets = tiny_easyxml, tiny_minidom, tiny_roxmltree, tiny_xmltree, tiny_sdx_document, tiny_xml_dom
 }
 
 criterion_group!(
@@ -52,12 +57,13 @@ criterion_group!(
     medium_roxmltree,
     medium_xmltree,
     medium_sdx_document,
+    medium_xml_dom
 );
 
 criterion_group! {
     name = large;
     config = Criterion::default().sample_size(50);
-    targets = large_easyxml, large_minidom, large_roxmltree, large_xmltree, large_sdx_document,
+    targets = large_easyxml, large_minidom, large_roxmltree, large_xmltree, large_sdx_document
 }
 
 criterion_group!(easyxml, tiny_easyxml, medium_easyxml, large_easyxml);
@@ -70,5 +76,6 @@ criterion_group!(
     large_sdx_document,
 );
 criterion_group!(minidom, tiny_minidom, medium_minidom, large_minidom);
+criterion_group!(xml_dom, tiny_xml_dom, medium_xml_dom);
 
-criterion_main!(easyxml);
+criterion_main!(xml_dom);
