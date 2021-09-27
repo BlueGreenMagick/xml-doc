@@ -1,7 +1,6 @@
 Root:
   - Decl:
       version: 1.0
-      encoding: UTF-8
   - Element:
       name: el
   - Text: "Text"

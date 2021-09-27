@@ -3,6 +3,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
 #[derive(Clone)]
@@ -46,11 +48,13 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
             } => {
                 write_line("- Decl:", depth, buf);
                 write_line(&format!("version: {}", version), depth + 2, buf);
+                /* Don't print encoding as this library can only write in UTF-8.
                 if let Some(val) = encoding {
                     write_line(&format!("encoding: {}", val), depth + 2, buf);
                 }
+                */
                 if let Some(val) = standalone {
-                    write_line(&format!("encoding: {}", val), depth + 2, buf);
+                    write_line(&format!("standalone: {}", val), depth + 2, buf);
                 }
             }
         }
@@ -120,6 +124,7 @@ fn get_expected(file_name: &str) -> TStr {
 fn test_write(document: &Document) -> TStr {
     let expected = TStr(to_yaml(&document));
     let written_xml = document.write_str().unwrap();
+    println!("{:?}", &written_xml);
     let new_doc = Document::from_str(&written_xml).unwrap();
     let result = TStr(to_yaml(&new_doc));
     assert!(
@@ -137,7 +142,6 @@ where
     S: Into<String>,
 {
     let xml_file = Path::new("tests/documents").join(xml_file);
-    let xml_raw = std::fs::read_to_string(&xml_file).unwrap();
 
     // Options
     let empty_text_node_opts = [true, false];
@@ -152,7 +156,10 @@ where
         // Read xml document
         let mut document = Document::new();
         document.read_opts = read_options.clone();
-        let result = if let Err(error) = document.read_str(&xml_raw) {
+        let file = File::open(&xml_file).unwrap();
+        let reader = BufReader::new(file);
+        let result = if let Err(error) = document.read_reader(reader) {
+            println!("{:?}", error);
             let debug_str = format!("{:?}", error);
             let variant_name = debug_str.splitn(2, "(").next().unwrap();
             TStr(format!("error: {}", variant_name))
@@ -183,6 +190,16 @@ fn emptytag() {
             "emptytag.yaml"
         }
     })
+}
+
+#[test]
+fn encoding1() {
+    test("encoding1.xml", |_| "encoding1.yaml".to_string())
+}
+
+#[test]
+fn encoding2() {
+    test("encoding2.xml", |_| "encoding2.yaml".to_string())
 }
 
 #[test]

@@ -1,0 +1,13 @@
+Root:
+  - Decl:
+      version: 1.0
+  - Element:
+      name: abc
+      children:
+        - Element:
+            name: text
+            children:
+              - Text: "가나다라"
+              - Element:
+                  name: single
+        - Text: "텍스트abc"
