@@ -329,37 +329,4 @@ mod tests {
                 .unwrap()
         )
     }
-
-    #[test]
-    fn test_namespace() {
-        let xml = r#"
-        <root xmlns="ns", xmlns:p="pns">
-            <p:foo xmlns="inner">
-                Hello
-            </p:foo>
-            <p:bar xmlns:p="in2">
-                <c />
-                World!
-            </p:bar>
-        </root>"#;
-        let doc = Document::from_str(xml).unwrap();
-        let root = doc.root().children(&doc)[0].as_element().unwrap();
-        let child_elements = root.child_elements(&doc);
-        let foo = *child_elements.get(0).unwrap();
-        let bar = *child_elements.get(1).unwrap();
-        let c = bar.child_elements(&doc)[0];
-        assert_eq!(c.prefix_name(&doc), ("", "c"));
-        assert_eq!(bar.raw_name(&doc), "p:bar");
-        assert_eq!(bar.prefix(&doc), "p");
-        assert_eq!(bar.name(&doc), "bar");
-        assert_eq!(c.namespace(&doc).unwrap(), "ns");
-        assert_eq!(c.namespace_for_prefix(&doc, "p").unwrap(), "in2");
-        assert!(c.namespace_for_prefix(&doc, "random").is_none());
-        assert_eq!(bar.namespace(&doc).unwrap(), "in2");
-        assert_eq!(bar.namespace_for_prefix(&doc, "").unwrap(), "ns");
-        assert_eq!(foo.namespace(&doc).unwrap(), "pns");
-        assert_eq!(foo.namespace_for_prefix(&doc, "").unwrap(), "inner");
-        assert_eq!(foo.namespace_for_prefix(&doc, "p").unwrap(), "pns");
-        assert_eq!(root.namespace(&doc).unwrap(), "ns");
-    }
 }

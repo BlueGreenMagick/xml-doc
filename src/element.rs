@@ -182,6 +182,21 @@ impl Element {
         &self.data(document).children
     }
 
+    fn _children_recursive<'a>(&self, document: &'a Document, nodes: &mut Vec<&'a Node>) {
+        for node in self.children(document) {
+            nodes.push(node);
+            if let Node::Element(elem) = &node {
+                elem._children_recursive(document, nodes);
+            }
+        }
+    }
+
+    pub fn children_recursive<'a>(&self, document: &'a Document) -> Vec<&'a Node> {
+        let mut nodes = Vec::new();
+        self._children_recursive(document, &mut nodes);
+        nodes
+    }
+
     /// ```ignore
     /// !self.children(document).is_empty()
     /// ```
@@ -191,6 +206,19 @@ impl Element {
 
     pub fn child_elements(&self, document: &Document) -> Vec<Element> {
         self.children(document)
+            .iter()
+            .filter_map(|node| {
+                if let Node::Element(elemid) = node {
+                    Some(*elemid)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn child_elements_recursive(&self, document: &Document) -> Vec<Element> {
+        self.children_recursive(document)
             .iter()
             .filter_map(|node| {
                 if let Node::Element(elemid) = node {
@@ -286,5 +314,78 @@ impl Element {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Document;
+
+    #[test]
+    fn test_children() {
+        let xml = r#"
+        <outer>
+            inside outer
+            <middle>
+                <inner>
+                    inside
+                </inner>
+                after inside
+            </middle>
+            <after>
+                inside after
+            </after>
+        </outer>
+        "#;
+        let doc = Document::from_str(xml).unwrap();
+        let outer = doc.root().child_elements(&doc)[0];
+        let middle = outer.child_elements(&doc)[0];
+        let inner = middle.child_elements(&doc)[0];
+        let after = outer.child_elements(&doc)[1];
+        assert_eq!(doc.root().child_elements(&doc).len(), 1);
+        assert_eq!(outer.name(&doc), "outer");
+        assert_eq!(middle.name(&doc), "middle");
+        assert_eq!(inner.name(&doc), "inner");
+        assert_eq!(after.name(&doc), "after");
+        assert_eq!(outer.children(&doc).len(), 3);
+        assert_eq!(outer.child_elements(&doc).len(), 2);
+        assert_eq!(doc.root().children_recursive(&doc).len(), 8);
+        assert_eq!(
+            doc.root().child_elements_recursive(&doc),
+            vec![outer, middle, inner, after]
+        );
+    }
+
+    #[test]
+    fn test_namespace() {
+        let xml = r#"
+        <root xmlns="ns", xmlns:p="pns">
+            <p:foo xmlns="inner">
+                Hello
+            </p:foo>
+            <p:bar xmlns:p="in2">
+                <c />
+                World!
+            </p:bar>
+        </root>"#;
+        let doc = Document::from_str(xml).unwrap();
+        let root = doc.root().children(&doc)[0].as_element().unwrap();
+        let child_elements = root.child_elements(&doc);
+        let foo = *child_elements.get(0).unwrap();
+        let bar = *child_elements.get(1).unwrap();
+        let c = bar.child_elements(&doc)[0];
+        assert_eq!(c.prefix_name(&doc), ("", "c"));
+        assert_eq!(bar.raw_name(&doc), "p:bar");
+        assert_eq!(bar.prefix(&doc), "p");
+        assert_eq!(bar.name(&doc), "bar");
+        assert_eq!(c.namespace(&doc).unwrap(), "ns");
+        assert_eq!(c.namespace_for_prefix(&doc, "p").unwrap(), "in2");
+        assert!(c.namespace_for_prefix(&doc, "random").is_none());
+        assert_eq!(bar.namespace(&doc).unwrap(), "in2");
+        assert_eq!(bar.namespace_for_prefix(&doc, "").unwrap(), "ns");
+        assert_eq!(foo.namespace(&doc).unwrap(), "pns");
+        assert_eq!(foo.namespace_for_prefix(&doc, "").unwrap(), "inner");
+        assert_eq!(foo.namespace_for_prefix(&doc, "p").unwrap(), "pns");
+        assert_eq!(root.namespace(&doc).unwrap(), "ns");
     }
 }
