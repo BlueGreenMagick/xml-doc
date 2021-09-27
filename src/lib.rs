@@ -28,7 +28,7 @@ impl ReadOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum Node {
     Element(Element),
     Text(String),
@@ -52,7 +52,7 @@ impl Node {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Document {
     pub read_opts: ReadOptions,
     counter: usize, // == self.store.len()

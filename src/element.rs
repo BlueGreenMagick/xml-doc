@@ -3,7 +3,7 @@ use super::{Document, Node};
 use std::collections::HashMap;
 
 /// Represents a XML document.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ElementData {
     raw_name: String,
     attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
