@@ -1,4 +1,4 @@
-Document:
+Root:
   - Element:
       name: root
       attributes:
