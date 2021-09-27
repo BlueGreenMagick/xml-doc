@@ -1,6 +1,16 @@
 use super::error::{Error, Result};
-use super::{Document, ElementData, Node};
+use super::{Document, Node};
 use std::collections::HashMap;
+
+/// Represents a XML document.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ElementData {
+    raw_name: String,
+    attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
+    namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
+    parent: Option<Element>,
+    children: Vec<Node>,
+}
 
 /// Represents an Xml Element.
 ///

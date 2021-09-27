@@ -1,7 +1,7 @@
 mod element;
 mod error;
 
-pub use crate::element::Element;
+pub use crate::element::{Element, ElementData};
 pub use crate::error::{Error, Result};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -51,18 +51,6 @@ impl Node {
         }
     }
 }
-
-/// Represents a XML document.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ElementData {
-    raw_name: String,
-    attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
-    namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
-    parent: Option<Element>,
-    children: Vec<Node>,
-}
-
-impl ElementData {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Document {
