@@ -50,7 +50,7 @@ pub enum Node {
 impl Node {
     pub fn as_element(&self) -> Option<Element> {
         match self {
-            Self::Element(id) => Some(*id),
+            Self::Element(elem) => Some(*elem),
             _ => None,
         }
     }
@@ -58,7 +58,6 @@ impl Node {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElementData {
-    id: Element,
     raw_name: String,
     attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
@@ -70,25 +69,31 @@ impl ElementData {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Document {
+    pub read_opts: ReadOptions,
     counter: usize, // == self.store.len()
     store: Vec<ElementData>,
-    pub read_opts: ReadOptions,
+    root: Element,
 }
 
 impl Document {
     pub fn new() -> Document {
-        let mut doc = Document {
-            counter: 0,
-            store: vec![],
+        let (root, root_data) = Element::root();
+        let doc = Document {
             read_opts: ReadOptions::default(),
+            counter: 1, // because root is id 0
+            store: vec![root_data],
+            root,
         };
         // create root element
-        Element::new(&mut doc, String::new());
         doc
     }
 
     pub fn root(&self) -> Element {
-        self.store.get(0).unwrap().id
+        self.root
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.store.len() == 1
     }
 }
 
@@ -107,7 +112,7 @@ impl Document {
     }
 
     pub fn read_str(&mut self, str: &str) -> Result<()> {
-        if self.root().has_children(self) {
+        if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_str(str);
@@ -116,7 +121,7 @@ impl Document {
     }
 
     pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
-        if self.root().has_children(self) {
+        if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
         let reader = Reader::from_reader(reader);
@@ -124,7 +129,7 @@ impl Document {
         Ok(())
     }
 
-    fn read_bytes_start<B: BufRead>(
+    fn handle_bytes_start<B: BufRead>(
         &mut self,
         reader: &Reader<B>,
         element_stack: &Vec<Element>,
@@ -165,7 +170,7 @@ impl Document {
             debug!(ev);
             match ev {
                 Ok(Event::Start(ref ev)) => {
-                    let element = self.read_bytes_start(&reader, &element_stack, ev)?;
+                    let element = self.handle_bytes_start(&reader, &element_stack, ev)?;
                     element_stack.push(element);
                 }
                 Ok(Event::End(_)) => {
@@ -178,7 +183,7 @@ impl Document {
                     }
                 }
                 Ok(Event::Empty(ref ev)) => {
-                    self.read_bytes_start(&reader, &element_stack, ev)?;
+                    self.handle_bytes_start(&reader, &element_stack, ev)?;
                 }
                 Ok(Event::Text(ev)) => {
                     let node = Node::Text(ev.unescape_and_decode(&reader)?);

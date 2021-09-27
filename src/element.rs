@@ -12,6 +12,18 @@ impl Element {
         Self::with_data(document, name.into(), HashMap::new(), HashMap::new())
     }
 
+    pub(crate) fn root() -> (Element, ElementData) {
+        let elem_data = ElementData {
+            raw_name: String::new(),
+            attributes: HashMap::new(),
+            namespace_decls: HashMap::new(),
+            parent: None,
+            children: Vec::new(),
+        };
+        let elem = Element { id: 0 };
+        return (elem, elem_data);
+    }
+
     pub(crate) fn with_data(
         document: &mut Document,
         raw_name: String,
@@ -22,7 +34,6 @@ impl Element {
             id: document.counter,
         };
         let elem_data = ElementData {
-            id: elem,
             raw_name,
             attributes,
             namespace_decls,
@@ -105,14 +116,13 @@ impl Element {
         prefix: &str,
     ) -> Option<&'a str> {
         let mut elem = *self;
-        while !elem.is_root() {
+        loop {
             let data = elem.data(document);
             if let Some(value) = data.namespace_decls.get(prefix) {
                 return Some(value);
             }
             elem = elem.parent(document)?;
         }
-        None
     }
 
     pub fn parent(&self, document: &Document) -> Option<Element> {
