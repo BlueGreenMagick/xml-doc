@@ -3,10 +3,11 @@ mod error;
 
 pub use crate::element::{Element, ElementData};
 pub use crate::error::{Error, Result};
+use encoding_rs::{Decoder, Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
-use std::io::{BufRead, Write};
+use std::io::{BufRead, Cursor, Read, Seek, Write};
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -46,6 +47,109 @@ impl Node {
         }
     }
 }
+
+struct DecodeReader<R: Read + Seek> {
+    decoder: Option<Decoder>,
+    inner: R,
+    undecoded: [u8; 4096],
+    undecoded_pos: usize,
+    undecoded_cap: usize,
+    remaining: [u8; 32], // Is there an encoding with > 32 bytes for a char?
+    decoded: [u8; 12288],
+    decoded_pos: usize,
+    decoded_cap: usize,
+}
+
+// TODO: Use inner's buffer for undecoded buffer.
+impl<R: Read + Seek> DecodeReader<R> {
+    // If Decoder is not set, don't decode.
+    fn new(reader: R, decoder: Option<Decoder>) -> DecodeReader<R> {
+        DecodeReader {
+            decoder,
+            inner: reader,
+            undecoded: [0; 4096],
+            undecoded_pos: 0,
+            undecoded_cap: 0,
+            remaining: [0; 32],
+            decoded: [0; 12288],
+            decoded_pos: 0,
+            decoded_cap: 0,
+        }
+    }
+
+    fn set_decoder(&mut self, dec: Option<Decoder>) {
+        self.decoder = dec;
+    }
+
+    // Call this only when decoder is Some
+    fn fill_buf_decode(&mut self) -> std::io::Result<&[u8]> {
+        if self.decoded_pos >= self.decoded_cap {
+            debug_assert!(self.decoded_pos == self.decoded_cap);
+            // Move remaining undecoded bytes at the end to start
+            let remaining = self.undecoded_cap - self.undecoded_pos;
+            if remaining <= 32 {
+                self.remaining[..remaining]
+                    .copy_from_slice(&self.undecoded[self.undecoded_pos..self.undecoded_cap]);
+                self.undecoded[..remaining].copy_from_slice(&self.remaining[..remaining]);
+                self.undecoded_cap = remaining;
+                self.undecoded_pos = 0;
+                // Fill undecoded buffer
+                let read = self.inner.read(&mut self.undecoded[self.undecoded_cap..])?;
+                if read == 0 && self.undecoded_cap == 0 {
+                    return Ok(&[]);
+                }
+                self.undecoded_cap += read;
+            }
+
+            // Fill decoded buffer
+            let (_res, read, written, _replaced) = self.decoder.as_mut().unwrap().decode_to_utf8(
+                &self.undecoded[self.undecoded_pos..self.undecoded_cap],
+                &mut self.decoded,
+                self.undecoded_cap == 0,
+            );
+            self.undecoded_pos += read;
+            self.decoded_cap += written;
+            self.decoded_pos = 0;
+        }
+        Ok(&self.decoded[self.decoded_pos..self.decoded_cap])
+    }
+
+    fn fill_buf_without_decode(&mut self) -> std::io::Result<&[u8]> {
+        if self.undecoded_pos >= self.undecoded_cap {
+            debug_assert!(self.undecoded_pos == self.undecoded_cap);
+            self.undecoded_cap = self.inner.read(&mut self.undecoded[..])?;
+            self.undecoded_pos = 0;
+        }
+        Ok(&self.undecoded[self.undecoded_pos..self.undecoded_cap])
+    }
+}
+
+impl<R: Read + Seek> Read for DecodeReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        (&self.decoded[..]).read(buf)
+    }
+}
+
+impl<R: Read + Seek> BufRead for DecodeReader<R> {
+    // Decoder may change from None to Some.
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        match &self.decoder {
+            Some(_) => self.fill_buf_decode(),
+            None => self.fill_buf_without_decode(),
+        }
+    }
+    fn consume(&mut self, amt: usize) {
+        match &self.decoder {
+            Some(_) => {
+                self.decoded_pos = std::cmp::min(self.decoded_pos + amt, self.decoded_cap);
+            }
+            None => {
+                self.undecoded_pos = std::cmp::min(self.undecoded_pos + amt, self.undecoded_cap);
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Document {
     pub read_opts: ReadOptions,
@@ -92,7 +196,8 @@ impl Document {
         Ok(document)
     }
 
-    pub fn from_reader<R: BufRead>(reader: R) -> Result<Document> {
+    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Document> {
+        // TODO: Maybe change this to 'Read + Seek'
         let mut document = Document::new();
         document.read_reader(reader)?;
         Ok(document)
@@ -106,9 +211,8 @@ impl Document {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
-        let reader = Reader::from_str(str);
-        self.read(reader)?;
-        Ok(())
+        let cursor = Cursor::new(str.as_bytes());
+        self.read_reader(cursor)
     }
 
     /// Parses xml string from reader.
@@ -116,34 +220,79 @@ impl Document {
     /// # Errors
     ///
     /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
-    pub fn read_reader<R: BufRead>(&mut self, reader: R) -> Result<()> {
+    pub fn read_reader<R: Read + Seek>(&mut self, reader: R) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
-        let reader = Reader::from_reader(reader);
-        self.read(reader)?;
+        self.read_start(reader)?;
         Ok(())
     }
 
-    fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
-        fn strip_quote<'a>(bytes: &'a [u8]) -> Result<&'a str> {
-            let b = bytes[0];
-            if b != b'"' && b == b'\'' {
-                return Err(Error::MalformedXML(
-                    "Attribute value without quotes".to_string(),
-                ));
+    fn read_start<B: Read + Seek>(&mut self, reader: B) -> Result<()> {
+        let mut bufreader = DecodeReader::new(reader, None);
+
+        let bytes = bufreader.fill_buf()?;
+        let init_encoding = match bytes {
+            [0xfe, 0xff, ..] => {
+                // UTF-16 BE BOM
+                bufreader.consume(2);
+                Some(UTF_16BE)
             }
-            let inner = &bytes[1..bytes.len()];
-            Ok(std::str::from_utf8(inner)?)
+            [0xff, 0xfe, ..] => {
+                // UTF-16 LE BOM
+                bufreader.consume(2);
+                Some(UTF_16LE)
+            }
+            [0xef, 0xbb, 0xbf, ..] => {
+                // UTF-8 BOM
+                bufreader.consume(3);
+                None
+            }
+            [0x00, 0x3c, 0x00, 0x3f] => Some(UTF_16BE),
+            [0x3c, 0x00, 0x3f, 0x00] => Some(UTF_16LE),
+            [0x3c, 0x3f, ..] => None,
+            _ => None, // Assume UTF-8 for now.
+        };
+        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
+        let mut xmlreader = Reader::from_reader(bufreader);
+        xmlreader.trim_text(true);
+        let mut buf = Vec::new();
+        let event = xmlreader.read_event(&mut buf)?;
+        if let Event::Decl(ev) = event {
+            self.handle_decl(&ev)?;
+            if let Some(encoding_str) = &self.encoding {
+                let encoding = Encoding::for_label(encoding_str.as_bytes())
+                    .ok_or_else(|| Error::MalformedXML("Cannot Decode".to_string()))?;
+                let encoding = if encoding == UTF_8 {
+                    None
+                } else {
+                    Some(encoding)
+                };
+                if encoding != init_encoding {
+                    let mut decode_reader = xmlreader.into_underlying_reader();
+                    decode_reader
+                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
+                    xmlreader = Reader::from_reader(decode_reader);
+                    xmlreader.trim_text(true);
+                }
+            }
+            self.read(xmlreader)
+        } else {
+            Err(Error::MalformedXML(
+                "Didn't find XML Declaration at the start of file".to_string(),
+            ))
         }
-        self.version = strip_quote(&ev.version()?)?.to_string();
+    }
+
+    fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
+        self.version = String::from_utf8(ev.version()?.to_vec())?;
         self.encoding = match ev.encoding() {
-            Some(res) => Some(strip_quote(&res?)?.to_string()),
+            Some(res) => Some(String::from_utf8(res?.to_vec())?),
             None => None,
         };
         self.standalone = match ev.standalone() {
             Some(res) => {
-                let val = strip_quote(&res?)?.to_lowercase();
+                let val = std::str::from_utf8(&*res?)?.to_lowercase();
                 if val == "yes" {
                     true
                 } else if val == "no" {
@@ -188,8 +337,6 @@ impl Document {
     }
 
     fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        reader.trim_text(true);
-
         let mut buf = Vec::new();
         let mut element_stack: Vec<Element> = vec![self.root()]; // root element in element_stack
 
@@ -339,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_add_element() {
-        let xml = r#"
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
         <basic>
             Text
             <c />

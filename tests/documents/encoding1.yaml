@@ -1,6 +1,4 @@
 Root:
-  - Decl:
-      version: 1.0
   - Element:
       name: abc
       children:

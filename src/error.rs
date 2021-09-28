@@ -15,6 +15,7 @@ pub enum Error {
     NotEmpty,
     HasAParent,
     LazyError(quick_xml::Error),
+    Temporary,
 }
 
 impl From<XMLError> for Error {
@@ -37,5 +38,11 @@ impl From<FromUtf8Error> for Error {
 impl From<Utf8Error> for Error {
     fn from(_: Utf8Error) -> Error {
         Error::MalformedXML("Not a valid utf-8".to_string())
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(_: std::io::Error) -> Error {
+        Error::Temporary
     }
 }
