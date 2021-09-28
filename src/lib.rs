@@ -268,7 +268,10 @@ impl Document {
                 } else {
                     Some(encoding)
                 };
-                if encoding != init_encoding {
+                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
+                if encoding != init_encoding
+                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
+                {
                     let mut decode_reader = xmlreader.into_underlying_reader();
                     decode_reader
                         .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
