@@ -277,7 +277,7 @@ impl Document {
         };
         writer.write_event(Event::Decl(BytesDecl::new(
             self.version.as_bytes(),
-            self.encoding.as_ref().map(|s| s.as_bytes()),
+            Some("UTF-8".as_bytes()),
             standalone,
         )))?;
         Ok(())
