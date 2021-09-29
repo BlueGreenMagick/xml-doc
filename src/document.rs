@@ -4,7 +4,9 @@ use encoding_rs::{Decoder, Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::{BufRead, Read, Write};
+use std::path::Path;
 use std::str::FromStr;
 
 #[cfg(debug_assertions)]
@@ -253,10 +255,17 @@ impl Document {
     ///
     /// Returns Errors from [`.read_reader()`].
     pub fn parse_str(&mut self, str: &str) -> Result<()> {
-        if !self.is_empty() {
-            return Err(Error::NotEmpty);
-        }
         self.parse_reader(str.as_bytes())
+    }
+
+    /// Parses xml string from file.
+    ///
+    /// # Errors
+    ///
+    /// Returns Errors from [`.read_reader()`].
+    pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let file = File::open(path)?;
+        self.parse_reader(file)
     }
 
     /// Parses xml string from reader. You can only call this from an empty document.
@@ -456,6 +465,11 @@ impl Document {
                 Err(e) => return Err(Error::from(e)),
             }
         }
+    }
+
+    pub fn write_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let mut file = File::open(path)?;
+        self.write(&mut file)
     }
 
     /// Writes document as xml string.
