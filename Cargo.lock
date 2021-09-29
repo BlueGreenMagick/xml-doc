@@ -181,7 +181,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "easyxml"
+name = "easy-xml"
 version = "0.1.0"
 dependencies = [
  "criterion",

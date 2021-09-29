@@ -12,9 +12,9 @@ macro_rules! bench {
     };
 }
 
-bench!("tiny.xml", tiny_easyxml, easyxml::Document::from_str);
-bench!("medium.xml", medium_easyxml, easyxml::Document::from_str);
-bench!("large.xml", large_easyxml, easyxml::Document::from_str);
+bench!("tiny.xml", tiny_easyxml, easy_xml::Document::from_str);
+bench!("medium.xml", medium_easyxml, easy_xml::Document::from_str);
+bench!("large.xml", large_easyxml, easy_xml::Document::from_str);
 
 bench!("tiny.xml", tiny_minidom, minidom::Element::from_str);
 bench!("medium.xml", medium_minidom, minidom::Element::from_str);

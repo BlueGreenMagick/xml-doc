@@ -1,4 +1,4 @@
-use easyxml::{Document, Element, Node, ReadOptions};
+use easy_xml::{Document, Element, Node, ReadOptions};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt;
