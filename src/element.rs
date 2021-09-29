@@ -11,7 +11,7 @@ pub(crate) struct ElementData {
     children: Vec<Node>,
 }
 
-/// Represents an Xml Element.
+/// Represents an XML element.
 ///
 /// This struct only contains a unique `usize` id and implements trait `Copy`.
 /// So you do not need to bother with having a reference.
@@ -68,11 +68,14 @@ impl Element {
         (elem, elem_data)
     }
 
+    /// Returns `true` if element is a container.
+    ///
+    /// See [`Document::container()`] for more information on 'container'.
     pub fn is_container(&self) -> bool {
         self.id == 0
     }
 
-    /// Seperate full_name by ':', returning (prefix, name).
+    /// Seperate full_name by `:`, returning (prefix, name).
     pub fn separate_prefix_name(full_name: &str) -> (&str, &str) {
         match full_name.split_once(":") {
             Some((prefix, name)) => (prefix, name),
@@ -81,6 +84,7 @@ impl Element {
     }
 }
 
+/// Below are methods that take `&Document` as its first argument.
 impl Element {
     fn data<'a>(&self, document: &'a Document) -> &'a ElementData {
         document.store.get(self.id).unwrap()
@@ -209,9 +213,7 @@ impl Element {
         self.data(document).parent
     }
 
-    /// ```ignore
-    /// self.parent(document).is_some()
-    /// ```
+    /// `self.parent(document).is_some()`
     pub fn has_parent(&self, document: &Document) -> bool {
         self.parent(document).is_some()
     }
@@ -237,9 +239,7 @@ impl Element {
         nodes
     }
 
-    /// ```ignore
-    /// !self.children(document).is_empty()
-    /// ```
+    /// `!self.children(document).is_empty()`
     pub fn has_children(&self, document: &Document) -> bool {
         !self.children(document).is_empty()
     }

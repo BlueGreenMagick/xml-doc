@@ -16,6 +16,8 @@ macro_rules! debug {
     };
 }
 
+/// Options when parsing xml.
+///
 /// `empty_text_node`: <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
@@ -30,6 +32,7 @@ impl ReadOptions {
     }
 }
 
+/// Represents an XML node.
 #[derive(Debug)]
 pub enum Node {
     Element(Element),
@@ -41,6 +44,27 @@ pub enum Node {
 }
 
 impl Node {
+    /// Useful to use inside `filter_map`.
+    ///
+    /// ```
+    /// use easy_xml::{Document, Element};
+    ///
+    /// let mut doc = Document::new();
+    /// doc.parse_str(r#"<?xml version="1.0" encoding="UTF-8"?>
+    /// <config>
+    ///     Random Text
+    ///     <max>1</max>
+    /// </config>
+    /// "#).unwrap();
+    ///
+    /// let elems: Vec<Element> = doc
+    ///     .root_element()
+    ///     .unwrap()
+    ///     .children(&doc)
+    ///     .iter()
+    ///     .filter_map(|n| n.as_element())
+    ///     .collect();
+    /// ```
     pub fn as_element(&self) -> Option<Element> {
         match self {
             Self::Element(elem) => Some(*elem),
@@ -175,12 +199,14 @@ impl<R: Read> BufRead for DecodeReader<R> {
 
 /// Represents a XML document.
 ///
-/// Use [`parse_str()`], [`parse_reader()`], or [`from_str()`] to parse xml.
+/// Use `parse_str()`, `parse_reader()`, `parse_file()` or `from_str()` to parse xml.
+///
+/// Use `write_str()`, `write()`, or `write_file()` to write xml.
 ///
 /// # Examples
 /// ```
 /// use easy_xml::Document;
-/// use std::str::FromStr;
+/// use std::str::FromStr; // Needed to use `Document::from_str()`.
 ///
 /// let mut doc = Document::from_str(r#"<?xml version="1.0" encoding="UTF-8"?>
 /// <package>
@@ -228,10 +254,24 @@ impl Document {
         }
     }
 
+    /// Get 'container' element of Document.
+    ///
+    /// The document uses an invisible 'container' element
+    /// which it uses to manage its root nodes.
+    ///
+    /// Its parent is None, and trying to change its parent will
+    /// return [`Error::ContainerCannotMove`].
+    ///
+    /// For the container element, only its `children` is relevant.
+    /// Other attributes are not used.
     pub fn container(&self) -> Element {
         self.container
     }
 
+    /// Returns `true` if document doesn't have any nodes.
+    /// Returns `false` if you added a node or parsed an xml.
+    ///
+    /// You can only call `parse_*()` if document is empty.
     pub fn is_empty(&self) -> bool {
         self.store.len() == 1
     }
@@ -241,15 +281,23 @@ impl Document {
         self.container.child_elements(self).get(0).copied()
     }
 
-    // Get root nodes of document.
+    /// Get root nodes of document.
     pub fn root_nodes(&self) -> &Vec<Node> {
         self.container.children(self)
     }
+
+    /// Push a node to end of root nodes.
+    /// If document has no [`Element`], pushing a [`Node::Element`] is
+    /// equivalent to setting it as root element.
+    pub fn push_root_node(&mut self, node: Node) -> Result<()> {
+        let elem = self.container;
+        elem.push_child(self, node)
+    }
 }
 
-// Read and write
+/// Methods for reading xml.
 impl Document {
-    /// Parses xml string. You can only call this from an empty document.
+    /// Parse xml string. You can only call this from an empty document.
     ///
     /// # Errors
     ///
@@ -258,7 +306,7 @@ impl Document {
         self.parse_reader(str.as_bytes())
     }
 
-    /// Parses xml string from file.
+    /// Parse xml string from file.
     ///
     /// # Errors
     ///
@@ -268,7 +316,7 @@ impl Document {
         self.parse_reader(file)
     }
 
-    /// Parses xml string from reader. You can only call this from an empty document.
+    /// Parse xml string from reader. You can only call this from an empty document.
     ///
     /// # Errors
     ///
@@ -466,7 +514,9 @@ impl Document {
             }
         }
     }
-
+}
+/// Methods for writing xml.
+impl Document {
     pub fn write_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let mut file = File::open(path)?;
         self.write(&mut file)
