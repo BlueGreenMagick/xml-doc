@@ -1,13 +1,14 @@
 mod element;
 mod error;
 
-pub use crate::element::{Element, ElementData};
+pub use crate::element::Element;
+use crate::element::ElementData;
 pub use crate::error::{Error, Result};
 use encoding_rs::{Decoder, Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
-use std::io::{BufRead, Cursor, Read, Write};
+use std::io::{BufRead, Read, Write};
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -152,6 +153,7 @@ impl<R: Read> BufRead for DecodeReader<R> {
     }
 }
 
+/// Represents a XML document.
 #[derive(Debug)]
 pub struct Document {
     pub read_opts: ReadOptions,
@@ -165,9 +167,10 @@ pub struct Document {
 }
 
 impl Document {
+    /// Create a blank new xml document.
     pub fn new() -> Document {
         let (root, root_data) = Element::root();
-        let doc = Document {
+        Document {
             read_opts: ReadOptions::default(),
             counter: 1, // because root is id 0
             store: vec![root_data],
@@ -175,9 +178,7 @@ impl Document {
             version: String::new(), // will be changed later
             encoding: None,
             standalone: false,
-        };
-        // create root element
-        doc
+        }
     }
 
     pub fn root(&self) -> Element {
@@ -198,12 +199,14 @@ impl Document {
         Ok(document)
     }
 
+    /// Create [`Document`] from reader.
     pub fn from_reader<R: Read>(reader: R) -> Result<Document> {
         let mut document = Document::new();
         document.read_reader(reader)?;
         Ok(document)
     }
-    /// Parses xml string.
+
+    /// Parses xml string. You can only call this from an empty document.
     ///
     /// # Errors
     ///
@@ -212,11 +215,10 @@ impl Document {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
-        let cursor = Cursor::new(str.as_bytes());
-        self.read_reader(cursor)
+        self.read_reader(str.as_bytes())
     }
 
-    /// Parses xml string from reader.
+    /// Parses xml string from reader. You can only call this from an empty document.
     ///
     /// # Errors
     ///
@@ -416,6 +418,7 @@ impl Document {
         Ok(String::from_utf8(buf).unwrap())
     }
 
+    /// Write document to writer. Will be written in UTF-8.
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let root = self.root();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);

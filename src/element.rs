@@ -2,9 +2,8 @@ use super::error::{Error, Result};
 use super::{Document, Node};
 use std::collections::HashMap;
 
-/// Represents a XML document.
 #[derive(Debug)]
-pub struct ElementData {
+pub(crate) struct ElementData {
     full_name: String,
     attributes: HashMap<String, String>, // q:attr="val" => {"q:attr": "val"}
     namespace_decls: HashMap<String, String>, // local namespace newly defined in attributes
@@ -14,11 +13,16 @@ pub struct ElementData {
 
 /// Represents an Xml Element.
 ///
-/// This struct only contains a unique usize id and implements trait `Copy`.
+/// This struct only contains a unique `usize` id and implements trait `Copy`.
 /// So you do not need to bother with having a reference.
 ///
 /// Because the actual data of the element is stored in [`Document`],
 /// most methods takes `&Document` or `&mut Document` as its first argument.
+///
+/// Note that an element can only interact with elements of the same document.
+/// If you for example attempt to call `.remove_child_elem()` with elements from other document,
+/// unexpected errors may occur, or may panic.
+/// You also can't move elements between documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Element {
     id: usize,
@@ -51,6 +55,7 @@ impl Element {
         elem
     }
 
+    /// Create a root Element
     pub(crate) fn root() -> (Element, ElementData) {
         let elem_data = ElementData {
             full_name: String::new(),
@@ -60,17 +65,18 @@ impl Element {
             children: Vec::new(),
         };
         let elem = Element { id: 0 };
-        return (elem, elem_data);
+        (elem, elem_data)
     }
 
     pub fn is_root(&self) -> bool {
         self.id == 0
     }
 
-    pub fn seperate_prefix_name<'a>(full_name: &'a str) -> (&'a str, &'a str) {
+    /// Seperate full_name by ':', returning (prefix, name).
+    pub fn separate_prefix_name(full_name: &str) -> (&str, &str) {
         match full_name.split_once(":") {
             Some((prefix, name)) => (prefix, name),
-            None => ("", &full_name),
+            None => ("", full_name),
         }
     }
 }
@@ -84,7 +90,7 @@ impl Element {
         document.store.get_mut(self.id).unwrap()
     }
 
-    /// Get raw name of element, including its namespace prefix.
+    /// Get full name of element, including its namespace prefix.
     pub fn full_name<'a>(&self, document: &'a Document) -> &'a str {
         &self.data(document).full_name
     }
@@ -93,16 +99,19 @@ impl Element {
     ///
     /// `<prefix: name` -> `("prefix", "name")`
     pub fn prefix_name<'a>(&self, document: &'a Document) -> (&'a str, &'a str) {
-        Self::seperate_prefix_name(self.full_name(document))
+        Self::separate_prefix_name(self.full_name(document))
     }
 
     /// Get namespace prefix of element, without name.
     ///
-    /// `<prefix:name>` -> `"prefix"`.
+    /// `<prefix:name>` -> `"prefix"`
     pub fn prefix<'a>(&self, document: &'a Document) -> &'a str {
         self.prefix_name(document).0
     }
 
+    /// Get name of element, without its namespace prefix.
+    ///
+    /// `<prefix:name>` -> `"name"`
     pub fn name<'a>(&self, document: &'a Document) -> &'a str {
         self.prefix_name(document).1
     }
@@ -119,6 +128,7 @@ impl Element {
     pub fn attributes<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
         &self.data(document).attributes
     }
+
     pub fn mut_attributes<'a>(
         &self,
         document: &'a mut Document,
@@ -133,7 +143,7 @@ impl Element {
         self.namespace_for_prefix(document, self.prefix(document))
     }
 
-    /// Gets HashMap of `prefix:namespace` declared in its attributes.
+    /// Gets HashMap of `xmlns:prefix=namespace` declared in this element's attributes.
     pub fn namespace_declarations<'a>(
         &self,
         document: &'a Document,
@@ -177,6 +187,7 @@ impl Element {
         self.parent(document).is_some()
     }
 
+    /// Get child [`Node`]s of this element.
     pub fn children<'a>(&self, document: &'a Document) -> &'a Vec<Node> {
         &self.data(document).children
     }
@@ -190,6 +201,7 @@ impl Element {
         }
     }
 
+    /// Get all child nodes recursively. (i.e. includes its children's children.)
     pub fn children_recursive<'a>(&self, document: &'a Document) -> Vec<&'a Node> {
         let mut nodes = Vec::new();
         self._children_recursive(document, &mut nodes);
@@ -203,6 +215,7 @@ impl Element {
         !self.children(document).is_empty()
     }
 
+    /// Get only child [`Element`]s of this element.
     pub fn child_elements(&self, document: &Document) -> Vec<Element> {
         self.children(document)
             .iter()
@@ -216,6 +229,7 @@ impl Element {
             .collect()
     }
 
+    /// Get child [`Element`]s recursively. (i.e. includes its child element's child elements)
     pub fn child_elements_recursive(&self, document: &Document) -> Vec<Element> {
         self.children_recursive(document)
             .iter()
@@ -303,6 +317,7 @@ impl Element {
         Ok(())
     }
 
+    /// Removes itself from its parent. Note that you can't add this element to other documents.
     pub fn detatch(&self, document: &mut Document) -> Result<()> {
         if self.is_root() {
             return Err(Error::RootCannotMove);
