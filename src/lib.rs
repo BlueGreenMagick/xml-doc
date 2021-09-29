@@ -7,7 +7,7 @@ use encoding_rs::{Decoder, Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
-use std::io::{BufRead, Cursor, Read, Seek, Write};
+use std::io::{BufRead, Cursor, Read, Write};
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -48,7 +48,7 @@ impl Node {
     }
 }
 
-struct DecodeReader<R: Read + Seek> {
+struct DecodeReader<R: Read> {
     decoder: Option<Decoder>,
     inner: R,
     undecoded: [u8; 4096],
@@ -60,8 +60,7 @@ struct DecodeReader<R: Read + Seek> {
     decoded_cap: usize,
 }
 
-// TODO: Use inner's buffer for undecoded buffer.
-impl<R: Read + Seek> DecodeReader<R> {
+impl<R: Read> DecodeReader<R> {
     // If Decoder is not set, don't decode.
     fn new(reader: R, decoder: Option<Decoder>) -> DecodeReader<R> {
         DecodeReader {
@@ -124,13 +123,13 @@ impl<R: Read + Seek> DecodeReader<R> {
     }
 }
 
-impl<R: Read + Seek> Read for DecodeReader<R> {
+impl<R: Read> Read for DecodeReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         (&self.decoded[..]).read(buf)
     }
 }
 
-impl<R: Read + Seek> BufRead for DecodeReader<R> {
+impl<R: Read> BufRead for DecodeReader<R> {
     // Decoder may change from None to Some.
     fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
         match &self.decoder {
@@ -196,8 +195,7 @@ impl Document {
         Ok(document)
     }
 
-    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Document> {
-        // TODO: Maybe change this to 'Read + Seek'
+    pub fn from_reader<R: Read>(reader: R) -> Result<Document> {
         let mut document = Document::new();
         document.read_reader(reader)?;
         Ok(document)
@@ -220,7 +218,7 @@ impl Document {
     /// # Errors
     ///
     /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
-    pub fn read_reader<R: Read + Seek>(&mut self, reader: R) -> Result<()> {
+    pub fn read_reader<R: Read>(&mut self, reader: R) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
@@ -228,7 +226,7 @@ impl Document {
         Ok(())
     }
 
-    fn read_start<B: Read + Seek>(&mut self, reader: B) -> Result<()> {
+    fn read_start<B: Read>(&mut self, reader: B) -> Result<()> {
         let mut bufreader = DecodeReader::new(reader, None);
 
         let bytes = bufreader.fill_buf()?;
