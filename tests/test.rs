@@ -27,8 +27,8 @@ fn to_yaml(document: &Document) -> String {
     let mut depth: usize = 0;
     write_line("Root:", depth, &mut buf);
     depth += 1;
-    let root = document.root();
-    render_nodes(document, root.children(&document), depth, &mut buf);
+    let container = document.container();
+    render_nodes(document, container.children(&document), depth, &mut buf);
     buf
 }
 

@@ -9,7 +9,7 @@ pub enum Error {
     CannotDecode,
     MalformedXML(String),
     NotEmpty,
-    RootCannotMove,
+    ContainerCannotMove,
     NotFound,
     HasAParent,
 }

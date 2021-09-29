@@ -55,8 +55,8 @@ impl Element {
         elem
     }
 
-    /// Create a root Element
-    pub(crate) fn root() -> (Element, ElementData) {
+    /// Create a container Element
+    pub(crate) fn container() -> (Element, ElementData) {
         let elem_data = ElementData {
             full_name: String::new(),
             attributes: HashMap::new(),
@@ -68,7 +68,7 @@ impl Element {
         (elem, elem_data)
     }
 
-    pub fn is_root(&self) -> bool {
+    pub fn is_container(&self) -> bool {
         self.id == 0
     }
 
@@ -249,11 +249,11 @@ impl Element {
     ///
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
-    /// - [`Error::RootCannotMove`]: `node` cannot be root node.
+    /// - [`Error::ContainerCannotMove`]: `node` cannot be container node.
     pub fn push_child(&self, document: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
-            if elem.is_root() {
-                return Err(Error::RootCannotMove);
+            if elem.is_container() {
+                return Err(Error::ContainerCannotMove);
             }
             let data = elem.mut_data(document);
             if data.parent.is_some() {
@@ -271,11 +271,11 @@ impl Element {
     ///
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
-    /// - [`Error::RootCannotMove`]: `node` cannot be root node.
+    /// - [`Error::ContainerCannotMove`]: `node` cannot be container node.
     pub fn insert_child(&self, document: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
-            if elem.is_root() {
-                return Err(Error::RootCannotMove);
+            if elem.is_container() {
+                return Err(Error::ContainerCannotMove);
             }
             let data = elem.mut_data(document);
             if data.parent.is_some() {
@@ -320,9 +320,13 @@ impl Element {
     }
 
     /// Removes itself from its parent. Note that you can't add this element to other documents.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::ContainerCannotMove`]: You can't detatch container element
     pub fn detatch(&self, document: &mut Document) -> Result<()> {
-        if self.is_root() {
-            return Err(Error::RootCannotMove);
+        if self.is_container() {
+            return Err(Error::ContainerCannotMove);
         }
         let parent = self.data(document).parent;
         if let Some(parent) = parent {
@@ -354,20 +358,20 @@ mod tests {
         </outer>
         "#;
         let doc = Document::from_str(xml).unwrap();
-        let outer = doc.root().child_elements(&doc)[0];
+        let outer = doc.container().child_elements(&doc)[0];
         let middle = outer.child_elements(&doc)[0];
         let inner = middle.child_elements(&doc)[0];
         let after = outer.child_elements(&doc)[1];
-        assert_eq!(doc.root().child_elements(&doc).len(), 1);
+        assert_eq!(doc.container().child_elements(&doc).len(), 1);
         assert_eq!(outer.name(&doc), "outer");
         assert_eq!(middle.name(&doc), "middle");
         assert_eq!(inner.name(&doc), "inner");
         assert_eq!(after.name(&doc), "after");
         assert_eq!(outer.children(&doc).len(), 3);
         assert_eq!(outer.child_elements(&doc).len(), 2);
-        assert_eq!(doc.root().children_recursive(&doc).len(), 8);
+        assert_eq!(doc.container().children_recursive(&doc).len(), 8);
         assert_eq!(
-            doc.root().child_elements_recursive(&doc),
+            doc.container().child_elements_recursive(&doc),
             vec![outer, middle, inner, after]
         );
     }
@@ -385,8 +389,8 @@ mod tests {
             </p:bar>
         </root>"#;
         let doc = Document::from_str(xml).unwrap();
-        let root = doc.root().children(&doc)[0].as_element().unwrap();
-        let child_elements = root.child_elements(&doc);
+        let container = doc.container().children(&doc)[0].as_element().unwrap();
+        let child_elements = container.child_elements(&doc);
         let foo = *child_elements.get(0).unwrap();
         let bar = *child_elements.get(1).unwrap();
         let c = bar.child_elements(&doc)[0];
@@ -402,6 +406,6 @@ mod tests {
         assert_eq!(foo.namespace(&doc).unwrap(), "pns");
         assert_eq!(foo.namespace_for_prefix(&doc, "").unwrap(), "inner");
         assert_eq!(foo.namespace_for_prefix(&doc, "p").unwrap(), "pns");
-        assert_eq!(root.namespace(&doc).unwrap(), "ns");
+        assert_eq!(container.namespace(&doc).unwrap(), "ns");
     }
 }

@@ -160,7 +160,7 @@ pub struct Document {
     pub read_opts: ReadOptions,
     counter: usize, // == self.store.len()
     store: Vec<ElementData>,
-    root: Element,
+    container: Element,
 
     version: String,
     encoding: Option<String>,
@@ -170,20 +170,20 @@ pub struct Document {
 impl Document {
     /// Create a blank new xml document.
     pub fn new() -> Document {
-        let (root, root_data) = Element::root();
+        let (container, container_data) = Element::container();
         Document {
             read_opts: ReadOptions::default(),
-            counter: 1, // because root is id 0
-            store: vec![root_data],
-            root,
+            counter: 1, // because container is id 0
+            store: vec![container_data],
+            container,
             version: String::new(), // will be changed later
             encoding: None,
             standalone: false,
         }
     }
 
-    pub fn root(&self) -> Element {
-        self.root
+    pub fn container(&self) -> Element {
+        self.container
     }
 
     pub fn is_empty(&self) -> bool {
@@ -355,7 +355,7 @@ impl Document {
 
     fn read_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         let mut buf = Vec::with_capacity(200);
-        let mut element_stack: Vec<Element> = vec![self.root()]; // root element in element_stack
+        let mut element_stack: Vec<Element> = vec![self.container()]; // container element in element_stack
 
         loop {
             let ev = reader.read_event(&mut buf);
@@ -427,10 +427,10 @@ impl Document {
 
     /// Write document to writer. Will be written in UTF-8.
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
-        let root = self.root();
+        let container = self.container();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);
         self.write_decl(&mut writer)?;
-        self.write_nodes(&mut writer, root.children(self))?;
+        self.write_nodes(&mut writer, container.children(self))?;
         writer.write_event(Event::Eof)?;
         Ok(())
     }
@@ -511,7 +511,9 @@ mod tests {
         </basic>
         "#;
         let mut document = Document::from_str(xml).unwrap();
-        let basic = document.root().children(&document)[0].as_element().unwrap();
+        let basic = document.container().children(&document)[0]
+            .as_element()
+            .unwrap();
         let p = Element::new(&mut document, "p");
         basic.push_child(&mut document, Node::Element(p)).unwrap();
         assert_eq!(p.parent(&document).unwrap(), basic);
