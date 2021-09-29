@@ -223,6 +223,9 @@ impl Element {
     }
 
     /// Get only child [`Element`]s of this element.
+    ///
+    /// This calls `.children().iter().filter_map().collect()`.
+    /// Use [`Element::children()`] if performance is important.
     pub fn child_elements(&self, document: &Document) -> Vec<Element> {
         self.children(document)
             .iter()
@@ -247,6 +250,25 @@ impl Element {
                     None
                 }
             })
+            .collect()
+    }
+
+    /// Find first element with name `name`.
+    pub fn find(&self, document: &Document, name: &str) -> Option<Element> {
+        self.children(document)
+            .iter()
+            .filter_map(|n| n.as_element())
+            .filter(|e| e.name(document) == name)
+            .next()
+    }
+
+    /// Find first element with name `name`.
+    /// IF you care about performance, call `self.children().iter().filter()`
+    pub fn find_all(&self, document: &Document, name: &str) -> Vec<Element> {
+        self.children(document)
+            .iter()
+            .filter_map(|n| n.as_element())
+            .filter(|e| e.name(document) == name)
             .collect()
     }
 
