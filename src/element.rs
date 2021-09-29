@@ -1,5 +1,5 @@
-use super::error::{Error, Result};
-use super::{Document, Node};
+use crate::document::{Document, Node};
+use crate::error::{Error, Result};
 use std::collections::HashMap;
 
 #[derive(Debug)]
