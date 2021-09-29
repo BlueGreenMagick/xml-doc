@@ -90,6 +90,13 @@ impl Element {
         document.store.get_mut(self.id).unwrap()
     }
 
+    /// Returns true if this element is the root node of document.
+    ///
+    /// Note that this crate allows Document to have multiple elements, even though it's not valid xml.
+    pub fn is_root(&self, doc: &Document) -> bool {
+        self.parent(doc).map_or(false, |p| p.is_container())
+    }
+
     /// Get full name of element, including its namespace prefix.
     pub fn full_name<'a>(&self, document: &'a Document) -> &'a str {
         &self.data(document).full_name

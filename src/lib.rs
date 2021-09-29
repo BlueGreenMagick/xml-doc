@@ -189,6 +189,16 @@ impl Document {
     pub fn is_empty(&self) -> bool {
         self.store.len() == 1
     }
+
+    /// Get first element of document.
+    pub fn root(&self) -> Option<Element> {
+        self.container.child_elements(&self).get(0).map(|x| *x)
+    }
+
+    // Get root nodes of document.
+    pub fn root_nodes(&self) -> &Vec<Node> {
+        self.container.children(&self)
+    }
 }
 
 // Read and write
