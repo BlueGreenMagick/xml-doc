@@ -9,6 +9,7 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
+use std::str::FromStr;
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -175,6 +176,33 @@ impl<R: Read> BufRead for DecodeReader<R> {
 }
 
 /// Represents a XML document.
+///
+/// Use [`parse_str()`], [`parse_reader()`], or [`from_str()`] to parse xml.
+///
+/// # Examples
+/// ```
+/// use easy_xml::Document;
+/// use std::str::FromStr;
+///
+/// let mut doc = Document::from_str(r#"<?xml version="1.0" encoding="UTF-8"?>
+/// <package>
+///     <metadata>
+///         <author>Lewis Carol</author>
+///     </metadata>
+/// </package>
+/// "#).unwrap();
+/// let author_elem = doc
+///   .root_element()
+///   .unwrap()
+///   .find(&doc, "metadata")
+///   .unwrap()
+///   .find(&doc, "author")
+///   .unwrap();
+/// author_elem.set_text_content(&mut doc, "Lewis Carroll");
+/// let xml = doc.write_str();
+/// ```
+///
+
 #[derive(Debug)]
 pub struct Document {
     pub read_opts: ReadOptions,
@@ -211,42 +239,28 @@ impl Document {
     }
 
     /// Get first element of document.
-    pub fn root(&self) -> Option<Element> {
-        self.container.child_elements(&self).get(0).map(|x| *x)
+    pub fn root_element(&self) -> Option<Element> {
+        self.container.child_elements(self).get(0).copied()
     }
 
     // Get root nodes of document.
     pub fn root_nodes(&self) -> &Vec<Node> {
-        self.container.children(&self)
+        self.container.children(self)
     }
 }
 
 // Read and write
 impl Document {
-    /// Create [`Document`] from xml string.
-    pub fn from_str(str: &str) -> Result<Document> {
-        let mut document = Document::new();
-        document.read_str(str)?;
-        Ok(document)
-    }
-
-    /// Create [`Document`] from reader.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Document> {
-        let mut document = Document::new();
-        document.read_reader(reader)?;
-        Ok(document)
-    }
-
     /// Parses xml string. You can only call this from an empty document.
     ///
     /// # Errors
     ///
     /// Returns Errors from [`.read_reader()`].
-    pub fn read_str(&mut self, str: &str) -> Result<()> {
+    pub fn parse_str(&mut self, str: &str) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
-        self.read_reader(str.as_bytes())
+        self.parse_reader(str.as_bytes())
     }
 
     /// Parses xml string from reader. You can only call this from an empty document.
@@ -257,11 +271,11 @@ impl Document {
     /// - [`Error::CannotDecode`]: Could not decode XML.
     /// - [`Error::MalformedXML`]: Could not read XML.
     /// - [`Error::Io`]: IO Error
-    pub fn read_reader<R: Read>(&mut self, reader: R) -> Result<()> {
+    pub fn parse_reader<R: Read>(&mut self, reader: R) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
-        self.read_start(reader)?;
+        self.parse_start(reader)?;
         Ok(())
     }
 
@@ -318,7 +332,7 @@ impl Document {
     }
 
     // Look at the document decl and figure out the document encoding
-    fn read_start<B: Read>(&mut self, reader: B) -> Result<()> {
+    fn parse_start<B: Read>(&mut self, reader: B) -> Result<()> {
         let mut bufreader = DecodeReader::new(reader, None);
 
         let bytes = bufreader.fill_buf()?;
@@ -375,7 +389,7 @@ impl Document {
                     xmlreader.trim_text(true);
                 }
             }
-            self.read_content(xmlreader)
+            self.parse_content(xmlreader)
         } else {
             Err(Error::MalformedXML(
                 "Didn't find XML Declaration at the start of file".to_string(),
@@ -383,7 +397,7 @@ impl Document {
         }
     }
 
-    fn read_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
+    fn parse_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         let mut buf = Vec::with_capacity(200);
         let mut element_stack: Vec<Element> = vec![self.container()]; // container element in element_stack
 
@@ -525,6 +539,16 @@ impl Document {
             writer.write_event(Event::Empty(start))?;
         }
         Ok(())
+    }
+}
+
+impl FromStr for Document {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Document> {
+        let mut document = Document::new();
+        document.parse_str(s)?;
+        Ok(document)
     }
 }
 

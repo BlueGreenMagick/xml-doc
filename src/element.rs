@@ -192,10 +192,17 @@ impl Element {
     /// Concatenate all text content of this element, including its child elements `text_content()`.
     ///
     /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-    pub fn text_content<'a>(&self, document: &'a Document) -> String {
+    pub fn text_content(&self, document: &Document) -> String {
         let mut buf = String::new();
         self.build_text_content(document, &mut buf);
         buf
+    }
+
+    /// Clears all its children and inserts a [`Node::Text`] with given text.
+    pub fn set_text_content<S: Into<String>>(&self, document: &mut Document, text: S) {
+        self.clear_children(document);
+        let node = Node::Text(text.into());
+        self.mut_data(document).children.push(node);
     }
 
     pub fn parent(&self, document: &Document) -> Option<Element> {
@@ -337,7 +344,11 @@ impl Element {
     ///
     /// Panics if index is our of bounds.
     pub fn remove_child(&self, document: &mut Document, index: usize) -> Node {
-        self.mut_data(document).children.remove(index)
+        let node = self.mut_data(document).children.remove(index);
+        if let Node::Element(elem) = node {
+            elem.mut_data(document).parent = None;
+        }
+        node
     }
 
     /// Remove child element by value.
@@ -363,6 +374,13 @@ impl Element {
         Ok(())
     }
 
+    pub fn clear_children(&self, document: &mut Document) {
+        let children = &mut self.mut_data(document).children;
+        for _ in 0..children.len() {
+            self.remove_child(document, 0);
+        }
+    }
+
     /// Removes itself from its parent. Note that you can't add this element to other documents.
     ///
     /// # Errors
@@ -384,6 +402,7 @@ impl Element {
 #[cfg(test)]
 mod tests {
     use super::Document;
+    use std::str::FromStr;
 
     #[test]
     fn test_children() {
@@ -463,7 +482,7 @@ mod tests {
         "#;
         let doc = Document::from_str(xml).unwrap();
         assert_eq!(
-            doc.root()
+            doc.root_element()
                 .unwrap()
                 .find(&doc, "p")
                 .unwrap()
@@ -471,13 +490,13 @@ mod tests {
             "Text"
         );
         assert_eq!(
-            doc.root()
+            doc.root_element()
                 .unwrap()
                 .find(&doc, "b")
                 .unwrap()
                 .text_content(&doc),
             "Text2"
         );
-        assert_eq!(doc.root().unwrap().text_content(&doc), "TextText2")
+        assert_eq!(doc.root_element().unwrap().text_content(&doc), "TextText2")
     }
 }
