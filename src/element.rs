@@ -249,6 +249,7 @@ impl Element {
     ///
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
+    /// - [`Error::RootCannotMove`]: `node` cannot be root node.
     pub fn push_child(&self, document: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_root() {
@@ -270,6 +271,7 @@ impl Element {
     ///
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
+    /// - [`Error::RootCannotMove`]: `node` cannot be root node.
     pub fn insert_child(&self, document: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_root() {

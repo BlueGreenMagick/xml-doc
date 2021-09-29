@@ -17,9 +17,10 @@ macro_rules! debug {
     };
 }
 
+/// `empty_text_node`: <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
-    pub empty_text_node: bool, // <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+    pub empty_text_node: bool,
 }
 
 impl ReadOptions {
@@ -307,9 +308,15 @@ impl Document {
                 bufreader.consume(3);
                 None
             }
-            [0x00, 0x3c, 0x00, 0x3f] => Some(UTF_16BE),
-            [0x3c, 0x00, 0x3f, 0x00] => Some(UTF_16LE),
+            [0x00, 0x3c, 0x00, 0x3f, ..] => Some(UTF_16BE),
+            [0x3c, 0x00, 0x3f, 0x00, ..] => Some(UTF_16LE),
             [0x3c, 0x3f, ..] => None,
+            /*
+            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
+            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
+             */
             _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
         };
         bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
@@ -413,9 +420,9 @@ impl Document {
 
     /// Writes document as xml string.
     pub fn write_str(&self) -> Result<String> {
-        let mut buf: Vec<u8> = Vec::new();
+        let mut buf: Vec<u8> = Vec::with_capacity(200);
         self.write(&mut buf)?;
-        Ok(String::from_utf8(buf).unwrap())
+        Ok(String::from_utf8(buf)?)
     }
 
     /// Write document to writer. Will be written in UTF-8.
