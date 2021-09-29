@@ -1,21 +1,17 @@
-use std::{str::Utf8Error, string::FromUtf8Error};
-
-use crate::Element;
 use quick_xml::Error as XMLError;
+use std::{str::Utf8Error, string::FromUtf8Error};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    RootCannotMove,
-    NotFound,
-    IsAnElement,
-    ElementNotExist(Element),
+    Io(std::io::Error),
+    CannotDecode,
     MalformedXML(String),
     NotEmpty,
+    RootCannotMove,
+    NotFound,
     HasAParent,
-    LazyError(quick_xml::Error),
-    Temporary,
 }
 
 impl From<XMLError> for Error {
@@ -25,24 +21,26 @@ impl From<XMLError> for Error {
                 "Closing tag mismatch. Expected {}, found {}",
                 expected, found,
             )),
-            _ => Error::LazyError(err),
+            XMLError::Io(err) => Error::Io(err),
+            XMLError::Utf8(_) => Error::CannotDecode,
+            err => Error::MalformedXML(format!("{:?}", err)),
         }
     }
 }
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
-        Error::MalformedXML("Not a valid utf-8".to_string())
+        Error::CannotDecode
     }
 }
 impl From<Utf8Error> for Error {
     fn from(_: Utf8Error) -> Error {
-        Error::MalformedXML("Not a valid utf-8".to_string())
+        Error::CannotDecode
     }
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Error {
-        Error::Temporary
+    fn from(err: std::io::Error) -> Error {
+        Error::Io(err)
     }
 }

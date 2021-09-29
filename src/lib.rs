@@ -207,7 +207,7 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
+    /// Returns Errors from [`.read_reader()`].
     pub fn read_str(&mut self, str: &str) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
@@ -221,71 +221,15 @@ impl Document {
     /// # Errors
     ///
     /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
+    /// - [`Error::CannotDecode`]: Could not decode XML.
+    /// - [`Error::MalformedXML`]: Could not read XML.
+    /// - [`Error::Io`]: IO Error
     pub fn read_reader<R: Read>(&mut self, reader: R) -> Result<()> {
         if !self.is_empty() {
             return Err(Error::NotEmpty);
         }
         self.read_start(reader)?;
         Ok(())
-    }
-
-    fn read_start<B: Read>(&mut self, reader: B) -> Result<()> {
-        let mut bufreader = DecodeReader::new(reader, None);
-
-        let bytes = bufreader.fill_buf()?;
-        let init_encoding = match bytes {
-            [0xfe, 0xff, ..] => {
-                // UTF-16 BE BOM
-                bufreader.consume(2);
-                Some(UTF_16BE)
-            }
-            [0xff, 0xfe, ..] => {
-                // UTF-16 LE BOM
-                bufreader.consume(2);
-                Some(UTF_16LE)
-            }
-            [0xef, 0xbb, 0xbf, ..] => {
-                // UTF-8 BOM
-                bufreader.consume(3);
-                None
-            }
-            [0x00, 0x3c, 0x00, 0x3f] => Some(UTF_16BE),
-            [0x3c, 0x00, 0x3f, 0x00] => Some(UTF_16LE),
-            [0x3c, 0x3f, ..] => None,
-            _ => None, // Assume UTF-8 for now.
-        };
-        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
-        let mut xmlreader = Reader::from_reader(bufreader);
-        xmlreader.trim_text(true);
-        let mut buf = Vec::with_capacity(150);
-        let event = xmlreader.read_event(&mut buf)?;
-        if let Event::Decl(ev) = event {
-            self.handle_decl(&ev)?;
-            if let Some(encoding_str) = &self.encoding {
-                let encoding = Encoding::for_label(encoding_str.as_bytes())
-                    .ok_or_else(|| Error::MalformedXML("Cannot Decode".to_string()))?;
-                let encoding = if encoding == UTF_8 {
-                    None
-                } else {
-                    Some(encoding)
-                };
-                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
-                if encoding != init_encoding
-                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
-                {
-                    let mut decode_reader = xmlreader.into_underlying_reader();
-                    decode_reader
-                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
-                    xmlreader = Reader::from_reader(decode_reader);
-                    xmlreader.trim_text(true);
-                }
-            }
-            self.read_content(xmlreader)
-        } else {
-            Err(Error::MalformedXML(
-                "Didn't find XML Declaration at the start of file".to_string(),
-            ))
-        }
     }
 
     fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
@@ -338,6 +282,66 @@ impl Document {
         let parent = *element_stack.last().unwrap();
         parent.push_child(self, Node::Element(element)).unwrap();
         Ok(element)
+    }
+
+    // Look at the document decl and figure out the document encoding
+    fn read_start<B: Read>(&mut self, reader: B) -> Result<()> {
+        let mut bufreader = DecodeReader::new(reader, None);
+
+        let bytes = bufreader.fill_buf()?;
+        let init_encoding = match bytes {
+            [0xfe, 0xff, ..] => {
+                // UTF-16 BE BOM
+                bufreader.consume(2);
+                Some(UTF_16BE)
+            }
+            [0xff, 0xfe, ..] => {
+                // UTF-16 LE BOM
+                bufreader.consume(2);
+                Some(UTF_16LE)
+            }
+            [0xef, 0xbb, 0xbf, ..] => {
+                // UTF-8 BOM
+                bufreader.consume(3);
+                None
+            }
+            [0x00, 0x3c, 0x00, 0x3f] => Some(UTF_16BE),
+            [0x3c, 0x00, 0x3f, 0x00] => Some(UTF_16LE),
+            [0x3c, 0x3f, ..] => None,
+            _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
+        };
+        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
+        let mut xmlreader = Reader::from_reader(bufreader);
+        xmlreader.trim_text(true);
+        let mut buf = Vec::with_capacity(150);
+        let event = xmlreader.read_event(&mut buf)?;
+        if let Event::Decl(ev) = event {
+            self.handle_decl(&ev)?;
+            if let Some(encoding_str) = &self.encoding {
+                let encoding =
+                    Encoding::for_label(encoding_str.as_bytes()).ok_or(Error::CannotDecode)?;
+                let encoding = if encoding == UTF_8 {
+                    None
+                } else {
+                    Some(encoding)
+                };
+                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
+                if encoding != init_encoding
+                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
+                {
+                    let mut decode_reader = xmlreader.into_underlying_reader();
+                    decode_reader
+                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
+                    xmlreader = Reader::from_reader(decode_reader);
+                    xmlreader.trim_text(true);
+                }
+            }
+            self.read_content(xmlreader)
+        } else {
+            Err(Error::MalformedXML(
+                "Didn't find XML Declaration at the start of file".to_string(),
+            ))
+        }
     }
 
     fn read_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
