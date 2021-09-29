@@ -48,6 +48,26 @@ impl Node {
             _ => None,
         }
     }
+
+    fn build_text_content<'a>(&self, document: &'a Document, buf: &'a mut String) {
+        match self {
+            Node::Element(elem) => elem.build_text_content(document, buf),
+            Node::Text(text) => buf.push_str(text),
+            Node::CData(text) => buf.push_str(text),
+            Node::PI(text) => buf.push_str(text),
+            _ => {}
+        }
+    }
+
+    /// Returns content if node is `Text`, `CData`, or `PI`.
+    /// If node is `Element`, return [Element::text_content()]
+    ///
+    /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
+    pub fn text_content<'a>(&self, document: &'a Document) -> String {
+        let mut buf = String::new();
+        self.build_text_content(document, &mut buf);
+        buf
+    }
 }
 
 struct DecodeReader<R: Read> {

@@ -183,6 +183,21 @@ impl Element {
         }
     }
 
+    pub(crate) fn build_text_content<'a>(&self, document: &'a Document, buf: &'a mut String) {
+        for child in self.children(&document) {
+            child.build_text_content(document, buf);
+        }
+    }
+
+    /// Concatenate all text content of this element, including its child elements `text_content()`.
+    ///
+    /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
+    pub fn text_content<'a>(&self, document: &'a Document) -> String {
+        let mut buf = String::new();
+        self.build_text_content(document, &mut buf);
+        buf
+    }
+
     pub fn parent(&self, document: &Document) -> Option<Element> {
         self.data(document).parent
     }
@@ -263,7 +278,7 @@ impl Element {
     }
 
     /// Find first element with name `name`.
-    /// IF you care about performance, call `self.children().iter().filter()`
+    /// If you care about performance, call `self.children().iter().filter()`
     pub fn find_all(&self, document: &Document, name: &str) -> Vec<Element> {
         self.children(document)
             .iter()
@@ -436,5 +451,33 @@ mod tests {
         assert_eq!(foo.namespace_for_prefix(&doc, "").unwrap(), "inner");
         assert_eq!(foo.namespace_for_prefix(&doc, "p").unwrap(), "pns");
         assert_eq!(container.namespace(&doc).unwrap(), "ns");
+    }
+
+    #[test]
+    fn test_find_text_content() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <core>
+            <p>Text</p>
+            <b>Text2</b>
+        </core>
+        "#;
+        let doc = Document::from_str(xml).unwrap();
+        assert_eq!(
+            doc.root()
+                .unwrap()
+                .find(&doc, "p")
+                .unwrap()
+                .text_content(&doc),
+            "Text"
+        );
+        assert_eq!(
+            doc.root()
+                .unwrap()
+                .find(&doc, "b")
+                .unwrap()
+                .text_content(&doc),
+            "Text2"
+        );
+        assert_eq!(doc.root().unwrap().text_content(&doc), "TextText2")
     }
 }
