@@ -58,6 +58,7 @@ struct DecodeReader<R: Read> {
     decoded: [u8; 12288],
     decoded_pos: usize,
     decoded_cap: usize,
+    done: bool,
 }
 
 impl<R: Read> DecodeReader<R> {
@@ -73,41 +74,43 @@ impl<R: Read> DecodeReader<R> {
             decoded: [0; 12288],
             decoded_pos: 0,
             decoded_cap: 0,
+            done: false,
         }
     }
 
     fn set_decoder(&mut self, dec: Option<Decoder>) {
         self.decoder = dec;
+        self.done = false;
     }
 
     // Call this only when decoder is Some
     fn fill_buf_decode(&mut self) -> std::io::Result<&[u8]> {
         if self.decoded_pos >= self.decoded_cap {
             debug_assert!(self.decoded_pos == self.decoded_cap);
-            // Move remaining undecoded bytes at the end to start
+            if self.done {
+                return Ok(&[]);
+            }
             let remaining = self.undecoded_cap - self.undecoded_pos;
             if remaining <= 32 {
+                // Move remaining undecoded bytes at the end to start
                 self.remaining[..remaining]
                     .copy_from_slice(&self.undecoded[self.undecoded_pos..self.undecoded_cap]);
                 self.undecoded[..remaining].copy_from_slice(&self.remaining[..remaining]);
-                self.undecoded_cap = remaining;
-                self.undecoded_pos = 0;
                 // Fill undecoded buffer
-                let read = self.inner.read(&mut self.undecoded[self.undecoded_cap..])?;
-                if read == 0 && self.undecoded_cap == 0 {
-                    return Ok(&[]);
-                }
-                self.undecoded_cap += read;
+                let read = self.inner.read(&mut self.undecoded[remaining..])?;
+                self.done = read == 0;
+                self.undecoded_pos = 0;
+                self.undecoded_cap = remaining + read;
             }
 
             // Fill decoded buffer
             let (_res, read, written, _replaced) = self.decoder.as_mut().unwrap().decode_to_utf8(
                 &self.undecoded[self.undecoded_pos..self.undecoded_cap],
                 &mut self.decoded,
-                self.undecoded_cap == 0,
+                self.done,
             );
             self.undecoded_pos += read;
-            self.decoded_cap += written;
+            self.decoded_cap = written;
             self.decoded_pos = 0;
         }
         Ok(&self.decoded[self.decoded_pos..self.decoded_cap])
@@ -116,7 +119,7 @@ impl<R: Read> DecodeReader<R> {
     fn fill_buf_without_decode(&mut self) -> std::io::Result<&[u8]> {
         if self.undecoded_pos >= self.undecoded_cap {
             debug_assert!(self.undecoded_pos == self.undecoded_cap);
-            self.undecoded_cap = self.inner.read(&mut self.undecoded[..])?;
+            self.undecoded_cap = self.inner.read(&mut self.undecoded)?;
             self.undecoded_pos = 0;
         }
         Ok(&self.undecoded[self.undecoded_pos..self.undecoded_cap])
@@ -254,7 +257,7 @@ impl Document {
         bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
         let mut xmlreader = Reader::from_reader(bufreader);
         xmlreader.trim_text(true);
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(150);
         let event = xmlreader.read_event(&mut buf)?;
         if let Event::Decl(ev) = event {
             self.handle_decl(&ev)?;
@@ -277,7 +280,7 @@ impl Document {
                     xmlreader.trim_text(true);
                 }
             }
-            self.read(xmlreader)
+            self.read_content(xmlreader)
         } else {
             Err(Error::MalformedXML(
                 "Didn't find XML Declaration at the start of file".to_string(),
@@ -337,8 +340,8 @@ impl Document {
         Ok(element)
     }
 
-    fn read<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        let mut buf = Vec::new();
+    fn read_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
+        let mut buf = Vec::with_capacity(200);
         let mut element_stack: Vec<Element> = vec![self.root()]; // root element in element_stack
 
         loop {
