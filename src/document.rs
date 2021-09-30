@@ -378,7 +378,7 @@ impl Document {
             }
             attributes.insert(key, value);
         }
-        element.mut_namespace_declarations(self).extend(namespaces);
+        element.mut_namespace_decls(self).extend(namespaces);
         let parent = *element_stack.last().unwrap();
         parent.push_child(self, Node::Element(element)).unwrap();
         Ok(element)
@@ -583,7 +583,7 @@ impl Document {
         for (key, val) in element.attributes(self) {
             start.push_attribute((key.as_bytes(), val.as_bytes()));
         }
-        for (prefix, val) in element.namespace_declarations(self) {
+        for (prefix, val) in element.namespace_decls(self) {
             let attr_name = if prefix.is_empty() {
                 "xmlns".to_string()
             } else {

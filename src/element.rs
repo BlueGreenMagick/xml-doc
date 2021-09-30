@@ -11,6 +11,82 @@ pub(crate) struct ElementData {
     children: Vec<Node>,
 }
 
+/// An easy way to build a new element
+/// by chaining methods to add properties.
+/// Call [`Element::build()`] to start building.
+///
+/// # Examples
+///
+/// ```
+/// use easy_xml::{Document, Element, Node};
+///
+/// let mut doc = Document::new();
+///
+/// let root = Element::build(&mut doc, "root")
+///     .attribute("id", "main")
+///     .attribute("class", "main")
+///     .finish();
+/// doc.push_root_node(root.as_node());
+///
+/// Element::build(&mut doc, "name")
+///     .text_content("No Name")
+///     .push_to(root);
+///
+/// /* Equivalent xml:
+///   <root id="main" class="main">
+///     <name>No Name</name>
+///   </root>
+/// */
+/// ```
+///
+pub struct ElementBuilder<'a> {
+    element: Element,
+    doc: &'a mut Document,
+}
+
+impl<'a> ElementBuilder<'a> {
+    fn new(element: Element, doc: &'a mut Document) -> ElementBuilder<'a> {
+        ElementBuilder { element, doc }
+    }
+
+    /// Removes previous prefix if it exists, and attach new prefix.
+    pub fn prefix<S: Into<String>>(self, prefix: S) -> Self {
+        self.element.set_prefix(self.doc, prefix);
+        self
+    }
+
+    pub fn attribute<S, T>(self, name: S, value: T) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        self.element.set_attribute(self.doc, name, value);
+        self
+    }
+
+    pub fn namespace_decl<S, T>(self, prefix: S, namespace: T) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        self.element.set_namespace_decl(self.doc, prefix, namespace);
+        self
+    }
+
+    pub fn text_content<S: Into<String>>(self, text: S) -> Self {
+        self.element.set_text_content(self.doc, text);
+        self
+    }
+
+    pub fn finish(self) -> Element {
+        self.element
+    }
+
+    pub fn push_to(self, parent: Element) {
+        self.element.push_to(self.doc, parent).unwrap()
+    }
+}
+
 /// Represents an XML element.
 ///
 /// This struct only contains a unique `usize` id and implements trait `Copy`.
@@ -24,20 +100,6 @@ pub(crate) struct ElementData {
 /// unexpected errors may occur, or may panic.
 /// You also can't move elements between documents.
 ///
-/// # Examples
-///
-/// ```
-/// use easy_xml::{Document, Element, Node};
-///
-/// let mut doc = Document::new();
-/// let root = Element::new(&mut doc, "root");
-/// root.mut_attributes(&mut doc).insert("id".to_string(), "main".to_string());
-/// doc.push_root_node(Node::Element(root));
-///
-/// let name = Element::new(&mut doc, "name");
-/// name.set_text_content(&mut doc, "Its Name");
-/// root.push_child(&mut doc, Node::Element(name));
-/// ```
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Element {
@@ -45,9 +107,18 @@ pub struct Element {
 }
 
 impl Element {
-    /// Create a new empty element with name.
-    pub fn new<S: Into<String>>(document: &mut Document, name: S) -> Element {
-        Self::with_data(document, name.into(), HashMap::new(), HashMap::new())
+    /// Create a new empty element with `full_name`.
+    ///
+    /// If full_name contains `:`,
+    /// everything before that will be interpreted as a namespace prefix.
+    pub fn new<S: Into<String>>(document: &mut Document, full_name: S) -> Self {
+        Self::with_data(document, full_name.into(), HashMap::new(), HashMap::new())
+    }
+
+    /// Chain methods to build an element easily.
+    pub fn build<S: Into<String>>(document: &mut Document, name: S) -> ElementBuilder {
+        let element = Self::new(document, name);
+        ElementBuilder::new(element, document)
     }
 
     pub(crate) fn with_data(
@@ -91,7 +162,13 @@ impl Element {
         self.id == 0
     }
 
+    pub fn as_node(&self) -> Node {
+        Node::Element(*self)
+    }
+
     /// Seperate full_name by `:`, returning (prefix, name).
+    ///
+    /// The first str is `""` if `full_name` has no prefix.
     pub fn separate_prefix_name(full_name: &str) -> (&str, &str) {
         match full_name.split_once(":") {
             Some((prefix, name)) => (prefix, name),
@@ -122,6 +199,10 @@ impl Element {
         &self.data(document).full_name
     }
 
+    pub fn set_full_name<S: Into<String>>(&self, document: &mut Document, name: S) {
+        self.mut_data(document).full_name = name.into();
+    }
+
     /// Get prefix and name of element.
     ///
     /// `<prefix: name` -> `("prefix", "name")`
@@ -136,6 +217,16 @@ impl Element {
         self.prefix_name(document).0
     }
 
+    /// Set prefix of element, preserving its name.
+    ///
+    /// `prefix` should not have a `:`,
+    /// or everything after `:` will be interpreted as part of element name.    
+    pub fn set_prefix<S: Into<String>>(&self, document: &mut Document, prefix: S) {
+        let data = self.mut_data(document);
+        let (_, name) = Self::separate_prefix_name(&data.full_name);
+        data.full_name = format!("{}:{}", prefix.into(), name);
+    }
+
     /// Get name of element, without its namespace prefix.
     ///
     /// `<prefix:name>` -> `"name"`
@@ -143,17 +234,53 @@ impl Element {
         self.prefix_name(document).1
     }
 
+    /// Set name of element, preserving its prefix.
+    ///
+    /// `name` should not have a `:`,
+    /// or everything before `:` may be interpreted as namespace prefix.
+    pub fn set_name<S: Into<String>>(&self, document: &mut Document, name: S) {
+        let data = self.mut_data(document);
+        let (prefix, _) = Self::separate_prefix_name(&data.full_name);
+        if prefix == "" {
+            data.full_name = name.into();
+        } else {
+            data.full_name = format!("{}:{}", prefix, name.into());
+        }
+    }
+
     /// Get attributes of element.
     ///
-    /// The attribute names may have namespace prefix. To strip the prefix and only its name, call [`Element::seperate_prefix_name`].
-    /// ```ignore
-    /// let attrs = element.attributes(&document);
-    /// for attr in attrs {
-    ///     let (prefix, name) = Element::seperate_prefix_name(attr);
+    /// The attribute names may have namespace prefix. To strip the prefix and only its name, call [`Element::separate_prefix_name`].
+    /// ```
+    /// use easy_xml::{Document, Element};
+    ///
+    /// let mut doc = Document::new();
+    /// let element = Element::build(&mut doc, "name")
+    ///     .attribute("id", "name")
+    ///     .attribute("pre:name", "value")
+    ///     .finish();
+    ///
+    /// let attrs = element.attributes(&doc);
+    /// for (full_name, value) in attrs {
+    ///     let (prefix, name) = Element::separate_prefix_name(full_name);
+    ///     // ("", "id"), ("pre", "name")
     /// }
     /// ```
     pub fn attributes<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
         &self.data(document).attributes
+    }
+
+    /// Add or set attribute.
+    ///
+    /// `name` should not contain a `:`,
+    /// or everything before `:` will be interpreted as namespace prefix.
+    pub fn set_attribute<S, T>(&self, document: &mut Document, name: S, value: T)
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        self.mut_attributes(document)
+            .insert(name.into(), value.into());
     }
 
     pub fn mut_attributes<'a>(
@@ -171,18 +298,24 @@ impl Element {
     }
 
     /// Gets HashMap of `xmlns:prefix=namespace` declared in this element's attributes.
-    pub fn namespace_declarations<'a>(
-        &self,
-        document: &'a Document,
-    ) -> &'a HashMap<String, String> {
+    pub fn namespace_decls<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
         &self.data(document).namespace_decls
     }
 
-    pub fn mut_namespace_declarations<'a>(
+    pub fn mut_namespace_decls<'a>(
         &self,
         document: &'a mut Document,
     ) -> &'a mut HashMap<String, String> {
         &mut self.mut_data(document).namespace_decls
+    }
+
+    pub fn set_namespace_decl<S, T>(&self, document: &mut Document, prefix: S, namespace: T)
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        self.mut_namespace_decls(document)
+            .insert(prefix.into(), namespace.into());
     }
 
     // TODO: check out https://www.w3.org/TR/xml-names/#ns-decl
@@ -224,7 +357,10 @@ impl Element {
         let node = Node::Text(text.into());
         self.mut_data(document).children.push(node);
     }
+}
 
+/// Below are methods related to finding nodes in tree.
+impl Element {
     pub fn parent(&self, document: &Document) -> Option<Element> {
         self.data(document).parent
     }
@@ -309,7 +445,16 @@ impl Element {
             .filter(|e| e.name(document) == name)
             .collect()
     }
+}
 
+/// Below are functions that modify its tree-structure.
+///
+/// Because an element has reference to both its parent and its children,
+/// an element's parent and children is not directly exposed for modification.
+///
+/// But in return, it is not possible for a document to be in an inconsistant state,
+/// where an element's parent doesn't have the element as its children.
+impl Element {
     /// Equivalent to `vec.push()`.
     ///
     /// # Errors
@@ -330,6 +475,11 @@ impl Element {
         }
         self.mut_data(document).children.push(node);
         Ok(())
+    }
+
+    /// Equivalent to `parent.push_child()`.
+    pub fn push_to(&self, document: &mut Document, parent: Element) -> Result<()> {
+        parent.push_child(document, self.as_node())
     }
 
     /// Equivalent to `vec.insert()`.

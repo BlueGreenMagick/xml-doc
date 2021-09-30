@@ -59,7 +59,7 @@ fn render_element(doc: &Document, elem: Element, mut depth: usize, buf: &mut Str
         write_hashmap_alphabetical(attrs, depth, buf);
     }
 
-    let namespaces = elem.namespace_declarations(doc);
+    let namespaces = elem.namespace_decls(doc);
     if namespaces.len() > 0 {
         write_line("namespaces:", depth, buf);
         write_hashmap_alphabetical(namespaces, depth, buf);
