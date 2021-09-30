@@ -13,7 +13,10 @@ pub(crate) struct ElementData {
 
 /// An easy way to build a new element
 /// by chaining methods to add properties.
+///
 /// Call [`Element::build()`] to start building.
+/// To finish building, either call `.finish()` or `.push_to(parent)`
+/// which returns [`Element`].
 ///
 /// # Examples
 ///
@@ -26,9 +29,9 @@ pub(crate) struct ElementData {
 ///     .attribute("id", "main")
 ///     .attribute("class", "main")
 ///     .finish();
-/// doc.push_root_node(root.as_node());
+/// doc.push_new_node(root.as_node());
 ///
-/// Element::build(&mut doc, "name")
+/// let name = Element::build(&mut doc, "name")
 ///     .text_content("No Name")
 ///     .push_to(root);
 ///
@@ -82,8 +85,9 @@ impl<'a> ElementBuilder<'a> {
         self.element
     }
 
-    pub fn push_to(self, parent: Element) {
-        self.element.push_to(self.doc, parent).unwrap()
+    pub fn push_to(self, parent: Element) -> Element {
+        self.element.push_to(self.doc, parent).unwrap();
+        self.element
     }
 }
 
