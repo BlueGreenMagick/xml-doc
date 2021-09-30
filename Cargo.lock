@@ -692,9 +692,9 @@ checksum = "d2d7d3948613f75c98fd9328cfdcc45acc4d360655289d0a7d4ec931392200a3"
 
 [[package]]
 name = "xml_dom"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7069c697889a8514f92efb3a0223c11a99367be0138f71057cf8cddacd11faa7"
+checksum = "b341d5df2d03c99c754f594c4fab8c913fe084d385249a4eb91cea26a50c702e"
 dependencies = [
  "log",
  "quick-xml 0.17.2",
