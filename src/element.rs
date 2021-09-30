@@ -23,6 +23,22 @@ pub(crate) struct ElementData {
 /// If you for example attempt to call `.remove_child_elem()` with elements from other document,
 /// unexpected errors may occur, or may panic.
 /// You also can't move elements between documents.
+///
+/// # Examples
+///
+/// ```
+/// use easy_xml::{Document, Element, Node};
+///
+/// let mut doc = Document::new();
+/// let root = Element::new(&mut doc, "root");
+/// root.mut_attributes(&mut doc).insert("id".to_string(), "main".to_string());
+/// doc.push_root_node(Node::Element(root));
+///
+/// let name = Element::new(&mut doc, "name");
+/// name.set_text_content(&mut doc, "Its Name");
+/// root.push_child(&mut doc, Node::Element(name));
+/// ```
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Element {
     id: usize,
