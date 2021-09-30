@@ -1,7 +1,10 @@
 [package]
 name = "benchmark"
+version = "0.1.0"
+edition = "2018"
 
 [dev-dependencies]
+easy-xml = {path = "../"}
 criterion = "0.3"
 minidom = "0.12"
 roxmltree = "0.14"
@@ -10,4 +13,13 @@ xml_dom = ">=0.2.5" # avoid quick-xml version conflict
 
 [[bench]]
 name = "bench"
+path = "bench.rs"
 harness = false
+
+[lib]
+path = "../src/lib.rs"
+
+
+[dependencies]
+quick-xml = "0.22"
+encoding_rs = "0.8"

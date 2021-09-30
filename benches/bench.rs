@@ -5,7 +5,7 @@ use std::path::Path;
 macro_rules! bench {
     ($filename:literal, $name:ident, $func:path) => {
         fn $name(c: &mut Criterion) {
-            let path = Path::new("benches").join($filename);
+            let path = Path::new($filename);
             c.bench_function(stringify!($name), |b| b.iter(|| $func(&path)));
         }
     };

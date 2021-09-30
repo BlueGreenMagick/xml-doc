@@ -13,15 +13,8 @@ categories = ["parser-implementations", "data-structures", "encoding"]
 quick-xml = "0.22"
 encoding_rs = "0.8"
 
-[dev-dependencies]
-criterion = "0.3"
-itertools = "0.10"
-minidom = "0.12"
-roxmltree = "0.14"
-sxd-document = "0.3"
-xmltree = "0.10"
-xml_dom = "<= 0.2.3" # avoid quick-xml version conflict
+[workspace]
+members = ["benches"]
 
-[[bench]]
-name = "bench"
-harness = false
+[dev-dependencies]
+itertools = "0.10"
