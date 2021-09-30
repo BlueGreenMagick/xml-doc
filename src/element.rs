@@ -29,7 +29,7 @@ pub(crate) struct ElementData {
 ///     .attribute("id", "main")
 ///     .attribute("class", "main")
 ///     .finish();
-/// doc.push_new_node(root.as_node());
+/// doc.push_root_node(root.as_node());
 ///
 /// let name = Element::build(&mut doc, "name")
 ///     .text_content("No Name")
