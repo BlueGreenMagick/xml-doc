@@ -2,11 +2,13 @@
 
 easy-xml is a rust library to read, modify, and write XML documents.
 
+It's aim is to be able to read *any* xml files, and be able to modify (only) the parts you want to.
+
 Features:
-- Most encodings can be read, including UTF-16, ISO 8859-1, GBK and EUC-KR. (With the notable exception of UTF-32)
+- Supports reading from most encodings, including UTF-16. (With the notable exception of UTF-32)
 - You can have references to the parts of the tree, and still mutate the tree.
 - Elements stores reference to its parent element, so traveling up the tree is fast.
-- One of the fastest XML tree-like parser. See [performance](https://github.com/bluegreenmagick/easy-xml#performance) section.
+- One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/easy-xml#performance).
 
 ## Example
 
@@ -21,7 +23,6 @@ let XML = r#"<?xml version="1.0"?>
     </metadata>
 </package>
 "#;
-
 
 let doc = Document::new();
 doc.parse_str(XML);
@@ -41,11 +42,11 @@ let new_xml = doc.write_str();
 ## Performance
 ### Parsing
 ```
-         tiny(4.8KB) medium(1.5MB)  large(25MB) medium(UTF-16, 3.0MB)
-easy_xml:  67.017us     28.347ms     339.31ms         29.729ms
-minidom:   96.403us     43.271ms     630.24ms
-roxmltree: 49.020us     16.304ms     332.86ms
-xmltree:   3964.2us     1228.5ms    21128.0ms
+          tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16, 3.0MB)
+easy_xml:   67.017us    28.347ms     339.31ms         29.729ms
+minidom:    96.403us    43.271ms     630.24ms
+roxmltree:  49.020us    16.304ms     332.86ms
+xmltree:  3964.2us    1228.5ms     21128.0ms
 ```
 
 You can see the result of benchmarks [here](https://github.com/BlueGreenMagick/easy-xml/actions/runs/1291967402).
