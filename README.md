@@ -41,26 +41,11 @@ let new_xml = doc.write_str();
 ## Performance
 ### Parsing
 ```
-// tiny.xml (4.8KB)
-easy_xml: 67.017us
-minidom: 96.403us
-roxmltree: 49.020us
-xmltree: 3964.2ms
-
-// medium.xml (1.5MB)
-easy_xml: 28.347ms
-minidom: 43.271ms
-roxmltree: 16.304ms
-xmltree: 1228.5ms
-
-// large.xml (25MB)
-easy_xml: 339.31ms
-minidom: 630.24ms
-roxmltree: 332.86ms
-xmltree: 21128.0ms
-
-// medium_utf16.xml (3.0MB) (medium.xml in UTF-16)
-easy_xml: 29.729ms
+         tiny(4.8KB) medium(1.5MB)  large(25MB) medium(UTF-16, 3.0MB)
+easy_xml:  67.017us     28.347ms     339.31ms         29.729ms
+minidom:   96.403us     43.271ms     630.24ms
+roxmltree: 49.020us     16.304ms     332.86ms
+xmltree:   3964.2us     1228.5ms    21128.0ms
 ```
 
 You can see the result of benchmarks [here](https://github.com/BlueGreenMagick/easy-xml/actions/runs/1291967402).
