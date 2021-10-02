@@ -2,7 +2,7 @@
 
 easy-xml is a rust library to read, modify, and write XML documents.
 
-It's aim is to be able to read *any* xml files, and be able to modify (only) the parts you want to.
+It's aim is to be able to read **any** xml files, and modify only the parts you want to.
 
 Features:
 - Supports reading from most encodings, including UTF-16. (With the notable exception of UTF-32)
@@ -40,6 +40,9 @@ let new_xml = doc.write_str();
 ```
 
 ## Performance
+
+To run benchmark: `cd benches ; cargo bench`. 
+
 ### Parsing
 ```
           tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16, 3.0MB)
