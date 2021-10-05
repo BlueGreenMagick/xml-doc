@@ -6,9 +6,7 @@ use encoding_rs::{Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::{BufRead, Read};
-use std::path::Path;
 
 #[cfg(debug_assertions)]
 macro_rules! debug {
@@ -152,20 +150,10 @@ impl DocumentParser {
         }
     }
 
-    /// - [`Error::Io`]: IO Error
     pub(crate) fn parse_reader<R: Read>(reader: R, opts: ReadOptions) -> Result<Document> {
         let mut parser = DocumentParser::new(opts);
         parser.parse_start(reader)?;
         Ok(parser.document)
-    }
-
-    pub(crate) fn parse_str(str: &str, opts: ReadOptions) -> Result<Document> {
-        DocumentParser::parse_reader(str.as_bytes(), opts)
-    }
-
-    pub(crate) fn parse_file(path: &Path, opts: ReadOptions) -> Result<Document> {
-        let file = File::open(path)?;
-        DocumentParser::parse_reader(file, opts)
     }
 
     fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {

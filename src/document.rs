@@ -170,11 +170,11 @@ impl Document {
     ///
     /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_str(str: &str) -> Result<Document> {
-        DocumentParser::parse_str(str, ReadOptions::default())
+        DocumentParser::parse_reader(str.as_bytes(), ReadOptions::default())
     }
 
     pub fn parse_str_with_opts(str: &str, opts: ReadOptions) -> Result<Document> {
-        DocumentParser::parse_str(str, opts)
+        DocumentParser::parse_reader(str.as_bytes(), opts)
     }
 
     /// Parse xml string from file.
@@ -183,11 +183,13 @@ impl Document {
     ///
     /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Document> {
-        DocumentParser::parse_file(path.as_ref(), ReadOptions::default())
+        let file = File::open(path)?;
+        DocumentParser::parse_reader(file, ReadOptions::default())
     }
 
     pub fn parse_file_with_opts<P: AsRef<Path>>(path: P, opts: ReadOptions) -> Result<Document> {
-        DocumentParser::parse_file(path.as_ref(), opts)
+        let file = File::open(path)?;
+        DocumentParser::parse_reader(file, opts)
     }
 
     /// Parse xml string from reader. You can only call this from an empty document.
