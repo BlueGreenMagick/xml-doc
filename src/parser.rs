@@ -209,72 +209,6 @@ impl DocumentParser {
         Ok(element)
     }
 
-    // Look at the document decl and figure out the document encoding
-    fn parse_start<B: Read>(&mut self, reader: B) -> Result<()> {
-        let mut bufreader = DecodeReader::new(reader, None);
-
-        let bytes = bufreader.fill_buf()?;
-        let init_encoding = match bytes {
-            [0xfe, 0xff, ..] => {
-                // UTF-16 BE BOM
-                bufreader.consume(2);
-                Some(UTF_16BE)
-            }
-            [0xff, 0xfe, ..] => {
-                // UTF-16 LE BOM
-                bufreader.consume(2);
-                Some(UTF_16LE)
-            }
-            [0xef, 0xbb, 0xbf, ..] => {
-                // UTF-8 BOM
-                bufreader.consume(3);
-                None
-            }
-            [0x00, 0x3c, 0x00, 0x3f, ..] => Some(UTF_16BE),
-            [0x3c, 0x00, 0x3f, 0x00, ..] => Some(UTF_16LE),
-            [0x3c, 0x3f, ..] => None,
-            /*
-            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
-            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
-             */
-            _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
-        };
-        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
-        let mut xmlreader = Reader::from_reader(bufreader);
-        xmlreader.trim_text(true);
-        let mut buf = Vec::with_capacity(150);
-        let event = xmlreader.read_event(&mut buf)?;
-        if let Event::Decl(ev) = event {
-            self.handle_decl(&ev)?;
-            if let Some(encoding_str) = &self.encoding {
-                let encoding =
-                    Encoding::for_label(encoding_str.as_bytes()).ok_or(Error::CannotDecode)?;
-                let encoding = if encoding == UTF_8 {
-                    None
-                } else {
-                    Some(encoding)
-                };
-                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
-                if encoding != init_encoding
-                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
-                {
-                    let mut decode_reader = xmlreader.into_underlying_reader();
-                    decode_reader
-                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
-                    xmlreader = Reader::from_reader(decode_reader);
-                    xmlreader.trim_text(true);
-                }
-            }
-            self.parse_content(xmlreader)
-        } else {
-            Err(Error::MalformedXML(
-                "Didn't find XML Declaration at the start of file".to_string(),
-            ))
-        }
-    }
-
     // Returns if document parsing is finished.
     fn handle_event(&mut self, element_stack: &mut Vec<Element>, event: Event) -> Result<bool> {
         let mut_doc = &mut self.document;
@@ -339,6 +273,72 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::Eof => Ok(true),
+        }
+    }
+
+    // Look at the document decl and figure out the document encoding
+    fn parse_start<B: Read>(&mut self, reader: B) -> Result<()> {
+        let mut bufreader = DecodeReader::new(reader, None);
+
+        let bytes = bufreader.fill_buf()?;
+        let init_encoding = match bytes {
+            [0xfe, 0xff, ..] => {
+                // UTF-16 BE BOM
+                bufreader.consume(2);
+                Some(UTF_16BE)
+            }
+            [0xff, 0xfe, ..] => {
+                // UTF-16 LE BOM
+                bufreader.consume(2);
+                Some(UTF_16LE)
+            }
+            [0xef, 0xbb, 0xbf, ..] => {
+                // UTF-8 BOM
+                bufreader.consume(3);
+                None
+            }
+            [0x00, 0x3c, 0x00, 0x3f, ..] => Some(UTF_16BE),
+            [0x3c, 0x00, 0x3f, 0x00, ..] => Some(UTF_16LE),
+            [0x3c, 0x3f, ..] => None,
+            /*
+            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
+            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
+             */
+            _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
+        };
+        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
+        let mut xmlreader = Reader::from_reader(bufreader);
+        xmlreader.trim_text(true);
+        let mut buf = Vec::with_capacity(150);
+        let event = xmlreader.read_event(&mut buf)?;
+        if let Event::Decl(ev) = event {
+            self.handle_decl(&ev)?;
+            if let Some(encoding_str) = &self.encoding {
+                let encoding =
+                    Encoding::for_label(encoding_str.as_bytes()).ok_or(Error::CannotDecode)?;
+                let encoding = if encoding == UTF_8 {
+                    None
+                } else {
+                    Some(encoding)
+                };
+                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
+                if encoding != init_encoding
+                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
+                {
+                    let mut decode_reader = xmlreader.into_underlying_reader();
+                    decode_reader
+                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
+                    xmlreader = Reader::from_reader(decode_reader);
+                    xmlreader.trim_text(true);
+                }
+            }
+            self.parse_content(xmlreader)
+        } else {
+            Err(Error::MalformedXML(
+                "Didn't find XML Declaration at the start of file".to_string(),
+            ))
         }
     }
 
