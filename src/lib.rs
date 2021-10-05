@@ -26,7 +26,7 @@
 //! metadata.push_child(&mut doc, Node::Element(series));
 //!
 //! // Modify existing element
-//! let date = metadata.find(&doc, "date").unwrap();
+//! let date = metadata.find(&doReadOptionsc, "date").unwrap();
 //! date.set_text_content(&mut doc, "29 July 1954");
 //!
 //! let xml = doc.write_str();
@@ -37,6 +37,7 @@ mod element;
 mod error;
 mod parser;
 
-pub use crate::document::{Document, Node, ReadOptions};
+pub use crate::document::{Document, Node};
 pub use crate::element::{Element, ElementBuilder};
 pub use crate::error::{Error, Result};
+pub use crate::parser::ReadOptions;

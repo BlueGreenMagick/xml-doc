@@ -105,3 +105,21 @@ impl<R: Read> BufRead for DecodeReader<R> {
         }
     }
 }
+
+
+
+/// Options when parsing xml.
+///
+/// `empty_text_node`: <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadOptions {
+    pub empty_text_node: bool,
+}
+
+impl ReadOptions {
+    pub fn default() -> ReadOptions {
+        ReadOptions {
+            empty_text_node: true,
+        }
+    }
+}

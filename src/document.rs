@@ -1,6 +1,6 @@
 use crate::element::{Element, ElementData};
 use crate::error::{Error, Result};
-use crate::parser::DecodeReader;
+use crate::parser::{DecodeReader, ReadOptions};
 use encoding_rs::{Encoding, UTF_16BE, UTF_16LE, UTF_8};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -17,21 +17,6 @@ macro_rules! debug {
     };
 }
 
-/// Options when parsing xml.
-///
-/// `empty_text_node`: <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReadOptions {
-    pub empty_text_node: bool,
-}
-
-impl ReadOptions {
-    pub fn default() -> ReadOptions {
-        ReadOptions {
-            empty_text_node: true,
-        }
-    }
-}
 
 /// Represents an XML node.
 #[derive(Debug)]
