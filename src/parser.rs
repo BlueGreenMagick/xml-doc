@@ -121,32 +121,42 @@ impl<R: Read> BufRead for DecodeReader<R> {
 
 /// Options when parsing xml.
 ///
-/// `empty_text_node`: <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+/// `empty_text_node`: true - <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+///
+/// `require_decl`: true - Returns error if document doesn't start with XML declaration.
+/// If this is set to false, the parser won't be able to decode encodings other than UTF-8.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
     pub empty_text_node: bool,
+    pub require_decl: bool,
 }
 
 impl ReadOptions {
     pub fn default() -> ReadOptions {
         ReadOptions {
             empty_text_node: true,
+            require_decl: true,
         }
     }
 }
 
+//TODO: don't unwrap element_stack.last() or pop(). Invalid XML file can crash the software.
 pub(crate) struct DocumentParser {
     document: Document,
     read_opts: ReadOptions,
     encoding: Option<&'static Encoding>,
+    element_stack: Vec<Element>,
 }
 
 impl DocumentParser {
     pub(crate) fn new(opts: ReadOptions) -> DocumentParser {
+        let doc = Document::new();
+        let element_stack = vec![doc.container()];
         DocumentParser {
-            document: Document::new(),
+            document: doc,
             read_opts: opts,
             encoding: None,
+            element_stack: element_stack,
         }
     }
 
@@ -212,16 +222,16 @@ impl DocumentParser {
     }
 
     // Returns true if document parsing is finished.
-    fn handle_event(&mut self, element_stack: &mut Vec<Element>, event: Event) -> Result<bool> {
+    fn handle_event(&mut self, event: Event) -> Result<bool> {
         match event {
             Event::Start(ref ev) => {
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 let element = self.handle_bytes_start(parent, ev)?;
-                element_stack.push(element);
+                self.element_stack.push(element);
                 Ok(false)
             }
             Event::End(_) => {
-                let elem = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+                let elem = self.element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
                 if self.read_opts.empty_text_node {
                     // distinguish <tag></tag> and <tag />
                     if !elem.has_children(&mut self.document) {
@@ -232,21 +242,21 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::Empty(ref ev) => {
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 self.handle_bytes_start(parent, ev)?;
                 Ok(false)
             }
             Event::Text(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::Text(content);
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::DocType(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::DocType(content);
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
@@ -254,21 +264,21 @@ impl DocumentParser {
             Event::Comment(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Comment(content);
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::CData(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::CData(content);
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::PI(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::PI(content);
-                let parent = *element_stack.last().unwrap();
+                let parent = *self.element_stack.last().unwrap();
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
@@ -286,6 +296,11 @@ impl DocumentParser {
 
         let bytes = decodereader.fill_buf()?;
         let init_encoding = match bytes {
+            [0x3c, 0x3f, ..] => None, // UTF-8 '<?'
+            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
+            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
+            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
             [0xfe, 0xff, ..] => {
                 // UTF-16 BE BOM
                 decodereader.consume(2);
@@ -303,14 +318,7 @@ impl DocumentParser {
             }
             [0x00, 0x3c, 0x00, 0x3f, ..] => Some(UTF_16BE),
             [0x3c, 0x00, 0x3f, 0x00, ..] => Some(UTF_16LE),
-            [0x3c, 0x3f, ..] => None,
-            /*
-            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
-            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
-             */
-            _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
+            _ => None, // Try decoding it with UTF-8
         };
         decodereader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
         let mut xmlreader = Reader::from_reader(decodereader);
@@ -329,23 +337,28 @@ impl DocumentParser {
                 xmlreader = Reader::from_reader(decode_reader);
                 xmlreader.trim_text(true);
             }
-            self.parse_content(xmlreader)
-        } else {
-            Err(Error::MalformedXML(
+        } else if self.read_opts.require_decl {
+            return Err(Error::MalformedXML(
                 "Didn't find XML Declaration at the start of file".to_string(),
-            ))
+            ));
+        } else if let Event::Eof = event {
+            return Err(Error::MalformedXML(
+                "Didn't find XML Declaration at the start of file".to_string(),
+            ));
+        } else {
+            self.handle_event(event)?;
         }
+        self.parse_content(xmlreader)
     }
 
     fn parse_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
         let mut buf = Vec::with_capacity(200); // reduce time increasing capacity at start.
-        let mut element_stack: Vec<Element> = vec![self.document.container()]; // container element in element_stack
 
         loop {
             let ev = reader.read_event(&mut buf)?;
             #[cfg(debug_assertions)]
             debug!(ev);
-            if self.handle_event(&mut element_stack, ev)? {
+            if self.handle_event(ev)? {
                 return Ok(());
             }
         }
