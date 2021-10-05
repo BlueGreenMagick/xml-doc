@@ -8,7 +8,6 @@ pub enum Error {
     Io(std::io::Error),
     CannotDecode,
     MalformedXML(String),
-    NotEmpty,
     ContainerCannotMove,
     NotFound,
     HasAParent,

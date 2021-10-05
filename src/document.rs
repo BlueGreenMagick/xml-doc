@@ -168,7 +168,7 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// Returns Errors from [`.read_reader()`].
+    /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_str(str: &str) -> Result<Document> {
         DocumentParser::parse_str(str, ReadOptions::default())
     }
@@ -181,7 +181,7 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// Returns Errors from [`.read_reader()`].
+    /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Document> {
         DocumentParser::parse_file(path.as_ref(), ReadOptions::default())
     }
@@ -194,7 +194,6 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// - [`Error::NotEmpty`]: You can only call this function on an empty document.
     /// - [`Error::CannotDecode`]: Could not decode XML.
     /// - [`Error::MalformedXML`]: Could not read XML.
     /// - [`Error::Io`]: IO Error
