@@ -149,19 +149,15 @@ pub(crate) struct DocumentParser {
 }
 
 impl DocumentParser {
-    pub(crate) fn new(opts: ReadOptions) -> DocumentParser {
+    pub(crate) fn parse_reader<R: Read>(reader: R, opts: ReadOptions) -> Result<Document> {
         let doc = Document::new();
         let element_stack = vec![doc.container()];
-        DocumentParser {
+        let mut parser = DocumentParser {
             document: doc,
             read_opts: opts,
             encoding: None,
             element_stack: element_stack,
-        }
-    }
-
-    pub(crate) fn parse_reader<R: Read>(reader: R, opts: ReadOptions) -> Result<Document> {
-        let mut parser = DocumentParser::new(opts);
+        };
         parser.parse_start(reader)?;
         Ok(parser.document)
     }
@@ -223,6 +219,9 @@ impl DocumentParser {
 
     // Returns true if document parsing is finished.
     fn handle_event(&mut self, event: Event) -> Result<bool> {
+        #[cfg(debug_assertions)]
+        debug!(event);
+
         match event {
             Event::Start(ref ev) => {
                 let parent = *self.element_stack.last().unwrap();
@@ -358,8 +357,6 @@ impl DocumentParser {
 
         loop {
             let ev = reader.read_event(&mut buf)?;
-            #[cfg(debug_assertions)]
-            debug!(ev);
             if self.handle_event(ev)? {
                 return Ok(());
             }
