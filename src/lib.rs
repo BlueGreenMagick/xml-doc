@@ -35,6 +35,7 @@
 mod document;
 mod element;
 mod error;
+mod parser;
 
 pub use crate::document::{Document, Node, ReadOptions};
 pub use crate::element::{Element, ElementBuilder};
