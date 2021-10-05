@@ -138,7 +138,7 @@ impl ReadOptions {
 pub(crate) struct DocumentParser {
     document: Document,
     read_opts: ReadOptions,
-    encoding: Option<String>,
+    encoding: Option<&'static Encoding>,
 }
 
 impl DocumentParser {
@@ -159,7 +159,14 @@ impl DocumentParser {
     fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
         self.document.version = String::from_utf8(ev.version()?.to_vec())?;
         self.encoding = match ev.encoding() {
-            Some(res) => Some(String::from_utf8(res?.to_vec())?),
+            Some(res) => {
+                let encoding = Encoding::for_label(&res?).ok_or(Error::CannotDecode)?;
+                if encoding == UTF_8 {
+                    None
+                } else {
+                    Some(encoding)
+                }
+            }
             None => None,
         };
         self.document.standalone = match ev.standalone() {
@@ -315,24 +322,15 @@ impl DocumentParser {
         let event = xmlreader.read_event(&mut buf)?;
         if let Event::Decl(ev) = event {
             self.handle_decl(&ev)?;
-            if let Some(encoding_str) = &self.encoding {
-                let encoding =
-                    Encoding::for_label(encoding_str.as_bytes()).ok_or(Error::CannotDecode)?;
-                let encoding = if encoding == UTF_8 {
-                    None
-                } else {
-                    Some(encoding)
-                };
-                // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
-                if encoding != init_encoding
-                    && !(encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
-                {
-                    let mut decode_reader = xmlreader.into_underlying_reader();
-                    decode_reader
-                        .set_decoder(encoding.map(|e| e.new_decoder_without_bom_handling()));
-                    xmlreader = Reader::from_reader(decode_reader);
-                    xmlreader.trim_text(true);
-                }
+            // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
+            if self.encoding != init_encoding
+                && !(self.encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
+            {
+                let mut decode_reader = xmlreader.into_underlying_reader();
+                decode_reader
+                    .set_decoder(self.encoding.map(|e| e.new_decoder_without_bom_handling()));
+                xmlreader = Reader::from_reader(decode_reader);
+                xmlreader.trim_text(true);
             }
             self.parse_content(xmlreader)
         } else {
