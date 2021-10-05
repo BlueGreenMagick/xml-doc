@@ -282,10 +282,7 @@ impl DocumentParser {
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
-            Event::Decl(ev) => {
-                self.handle_decl(&ev)?;
-                Ok(false)
-            }
+            Event::Decl(_) => Ok(false),
             Event::Eof => Ok(true),
         }
     }
