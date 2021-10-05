@@ -8,6 +8,7 @@ repository = "https://github.com/bluegreenmagick/easy-xml"
 license = "MIT OR Apache-2.0"
 keywords = ["xml", "parser", "reader", "writer"]
 categories = ["parser-implementations", "data-structures", "encoding"]
+autobenches = false
 
 [dependencies]
 quick-xml = "0.22"

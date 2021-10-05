@@ -12,8 +12,7 @@ macro_rules! bench {
 }
 
 fn easyxml_parse(path: &Path) {
-    let mut doc = easy_xml::Document::new();
-    doc.parse_file(path).unwrap();
+    easy_xml::Document::parse_file(path).unwrap();
 }
 bench!("tiny.xml", tiny_easyxml, easyxml_parse);
 bench!("medium.xml", medium_easyxml, easyxml_parse);
