@@ -171,15 +171,15 @@ impl DocumentParser {
         };
         self.document.standalone = match ev.standalone() {
             Some(res) => {
-                let val = std::str::from_utf8(&*res?)?.to_lowercase();
-                if val == "yes" {
-                    true
-                } else if val == "no" {
-                    false
-                } else {
-                    return Err(Error::MalformedXML(
-                        "Standalone Document Declaration has non boolean value".to_string(),
-                    ));
+                let val = std::str::from_utf8(&res?)?.to_lowercase();
+                match val.as_str() {
+                    "yes" => true,
+                    "no" => false,
+                    _ => {
+                        return Err(Error::MalformedXML(
+                            "Standalone Document Declaration has non boolean value".to_string(),
+                        ))
+                    }
                 }
             }
             None => false,
@@ -187,11 +187,7 @@ impl DocumentParser {
         Ok(())
     }
 
-    fn handle_bytes_start(
-        &mut self,
-        element_stack: &Vec<Element>,
-        ev: &BytesStart,
-    ) -> Result<Element> {
+    fn handle_bytes_start(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
         let mut_doc = &mut self.document;
         let full_name = String::from_utf8(ev.name().to_vec())?;
         let element = Element::new(mut_doc, full_name);
@@ -211,17 +207,16 @@ impl DocumentParser {
             attributes.insert(key, value);
         }
         element.mut_namespace_decls(mut_doc).extend(namespaces);
-        let parent = *element_stack.last().unwrap();
         parent.push_child(mut_doc, Node::Element(element)).unwrap();
         Ok(element)
     }
 
-    // Returns if document parsing is finished.
+    // Returns true if document parsing is finished.
     fn handle_event(&mut self, element_stack: &mut Vec<Element>, event: Event) -> Result<bool> {
-        let mut_doc = &mut self.document;
         match event {
             Event::Start(ref ev) => {
-                let element = self.handle_bytes_start(&element_stack, ev)?;
+                let parent = *element_stack.last().unwrap();
+                let element = self.handle_bytes_start(parent, ev)?;
                 element_stack.push(element);
                 Ok(false)
             }
@@ -229,50 +224,52 @@ impl DocumentParser {
                 let elem = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
                 if self.read_opts.empty_text_node {
                     // distinguish <tag></tag> and <tag />
-                    if !elem.has_children(mut_doc) {
-                        elem.push_child(mut_doc, Node::Text(String::new())).unwrap();
+                    if !elem.has_children(&mut self.document) {
+                        elem.push_child(&mut self.document, Node::Text(String::new()))
+                            .unwrap();
                     }
                 }
                 Ok(false)
             }
             Event::Empty(ref ev) => {
-                self.handle_bytes_start(&element_stack, ev)?;
+                let parent = *element_stack.last().unwrap();
+                self.handle_bytes_start(parent, ev)?;
                 Ok(false)
             }
             Event::Text(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::Text(content);
-                let elem = *element_stack.last().unwrap();
-                elem.push_child(mut_doc, node).unwrap();
+                let parent = *element_stack.last().unwrap();
+                parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::DocType(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::DocType(content);
-                let elem = *element_stack.last().unwrap();
-                elem.push_child(mut_doc, node).unwrap();
+                let parent = *element_stack.last().unwrap();
+                parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             // Comment, CData, and PI content is not escaped.
             Event::Comment(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Comment(content);
-                let elem = *element_stack.last().unwrap();
-                elem.push_child(mut_doc, node).unwrap();
+                let parent = *element_stack.last().unwrap();
+                parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::CData(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::CData(content);
-                let elem = *element_stack.last().unwrap();
-                elem.push_child(mut_doc, node).unwrap();
+                let parent = *element_stack.last().unwrap();
+                parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::PI(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::PI(content);
-                let elem = *element_stack.last().unwrap();
-                elem.push_child(mut_doc, node).unwrap();
+                let parent = *element_stack.last().unwrap();
+                parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
             Event::Decl(ev) => {
