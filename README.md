@@ -24,9 +24,9 @@ let XML = r#"<?xml version="1.0"?>
 </package>
 "#;
 
-let doc = Document::new();
-doc.parse_str(XML);
-let metadata = doc.root_element().unwrap().find(&doc, "metadata").unwrap();
+let doc = Document::parse_str(XML).unwrap();
+let package = doc.root_element().unwrap();
+let metadata = package.find(&doc, "metadata").unwrap();
 let title = metadata.find(&doc, "title").unwrap();
 title.set_attribute("xml:lang", "en");
 

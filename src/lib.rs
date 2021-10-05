@@ -16,8 +16,7 @@
 //! </metadata>
 //! "#;
 //!
-//! let mut doc = Document::new();
-//! doc.parse_str(data);
+//! let mut doc = Document::parse_str(data).unwrap();
 //! let metadata = doc.root_element().unwrap();
 //!
 //! // Add a new element
@@ -26,7 +25,7 @@
 //! metadata.push_child(&mut doc, Node::Element(series));
 //!
 //! // Modify existing element
-//! let date = metadata.find(&doReadOptionsc, "date").unwrap();
+//! let date = metadata.find(&doc, "date").unwrap();
 //! date.set_text_content(&mut doc, "29 July 1954");
 //!
 //! let xml = doc.write_str();

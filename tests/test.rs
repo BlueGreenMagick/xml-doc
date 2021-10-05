@@ -3,8 +3,6 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -138,18 +136,15 @@ where
         };
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);
-        // Read xml document
-        let mut document = Document::new();
-        document.read_opts = read_options.clone();
-        let file = File::open(&xml_file).unwrap();
-        let reader = BufReader::new(file);
-        let result = if let Err(error) = document.parse_reader(reader) {
-            println!("{:?}", error);
-            let debug_str = format!("{:?}", error);
-            let variant_name = debug_str.splitn(2, "(").next().unwrap();
-            TStr(format!("error: {}", variant_name))
-        } else {
-            test_write(&document)
+
+        let result = match Document::parse_file_with_opts(&xml_file, read_options.clone()) {
+            Ok(document) => test_write(&document),
+            Err(error) => {
+                println!("{:?}", error);
+                let debug_str = format!("{:?}", error);
+                let variant_name = debug_str.splitn(2, "(").next().unwrap();
+                TStr(format!("error: {}", variant_name))
+            }
         };
 
         assert!(
