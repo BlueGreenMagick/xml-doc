@@ -450,67 +450,82 @@ impl Document {
         }
     }
 
+    // Returns if document parsing is finished.
+    fn handle_event(&mut self, element_stack: &mut Vec<Element>, event: Event) -> Result<bool> {
+        match event {
+            Event::Start(ref ev) => {
+                let element = self.handle_bytes_start(&element_stack, ev)?;
+                element_stack.push(element);
+                Ok(false)
+            },
+            Event::End(_) => {
+                let elem = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+                if self.read_opts.empty_text_node {
+                    // distinguish <tag></tag> and <tag />
+                    if !elem.has_children(self) {
+                        elem.push_child(self, Node::Text(String::new())).unwrap();
+                    }
+                }
+                Ok(false)
+            },
+            Event::Empty(ref ev) => {
+                self.handle_bytes_start(&element_stack, ev)?;
+                Ok(false)
+            },
+            Event::Text(ev) => {
+                let content = String::from_utf8(ev.to_vec())?;
+                let node = Node::Text(content);
+                let elem = *element_stack.last().unwrap();
+                elem.push_child(self, node).unwrap();
+                Ok(false)
+            },
+            Event::DocType(ev) => {
+                let content = String::from_utf8(ev.to_vec())?;
+                let node = Node::DocType(content);
+                let elem = *element_stack.last().unwrap();
+                elem.push_child(self, node).unwrap();
+                Ok(false)
+            }
+            // Comment, CData, and PI content is not escaped.
+            Event::Comment(ev) => {
+                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                let node = Node::Comment(content);
+                let elem = *element_stack.last().unwrap();
+                elem.push_child(self, node).unwrap();
+                Ok(false)
+            }
+            Event::CData(ev) => {
+                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                let node = Node::CData(content);
+                let elem = *element_stack.last().unwrap();
+                elem.push_child(self, node).unwrap();
+                Ok(false)
+            }
+            Event::PI(ev) => {
+                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                let node = Node::PI(content);
+                let elem = *element_stack.last().unwrap();
+                elem.push_child(self, node).unwrap();
+                Ok(false)
+            },
+            Event::Decl(ev) => {
+                self.handle_decl(&ev)?;
+                Ok(false)
+            },
+            Event::Eof => Ok(true)
+        }
+    }
+
     fn parse_content<B: BufRead>(&mut self, mut reader: Reader<B>) -> Result<()> {
-        let mut buf = Vec::with_capacity(200);
+        let mut buf = Vec::with_capacity(200); // reduce time increasing capacity at start.
         let mut element_stack: Vec<Element> = vec![self.container()]; // container element in element_stack
 
         loop {
-            let ev = reader.read_event(&mut buf);
+            let ev = reader.read_event(&mut buf)?;
             #[cfg(debug_assertions)]
             debug!(ev);
-            match ev {
-                Ok(Event::Start(ref ev)) => {
-                    let element = self.handle_bytes_start(&element_stack, ev)?;
-                    element_stack.push(element);
-                }
-                Ok(Event::End(_)) => {
-                    let elem = element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
-                    if self.read_opts.empty_text_node {
-                        // distinguish <tag></tag> and <tag />
-                        if !elem.has_children(self) {
-                            elem.push_child(self, Node::Text(String::new())).unwrap();
-                        }
-                    }
-                }
-                Ok(Event::Empty(ref ev)) => {
-                    self.handle_bytes_start(&element_stack, ev)?;
-                }
-                Ok(Event::Text(ev)) => {
-                    let content = String::from_utf8(ev.to_vec())?;
-                    let node = Node::Text(content);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::DocType(ev)) => {
-                    let content = String::from_utf8(ev.to_vec())?;
-                    let node = Node::DocType(content);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                // Comment, CData, and PI content is not escaped.
-                Ok(Event::Comment(ev)) => {
-                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
-                    let node = Node::Comment(content);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::CData(ev)) => {
-                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
-                    let node = Node::CData(content);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::PI(ev)) => {
-                    let content = String::from_utf8(ev.unescaped()?.to_vec())?;
-                    let node = Node::PI(content);
-                    let elem = *element_stack.last().unwrap();
-                    elem.push_child(self, node).unwrap();
-                }
-                Ok(Event::Decl(ev)) => {
-                    self.handle_decl(&ev)?;
-                }
-                Ok(Event::Eof) => return Ok(()),
-                Err(e) => return Err(Error::from(e)),
+            if self.handle_event(&mut element_stack, ev)? {
+                return Ok(())
             }
         }
     }
