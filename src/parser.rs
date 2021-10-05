@@ -45,8 +45,8 @@ impl<R: Read> DecodeReader<R> {
         }
     }
 
-    pub(crate) fn set_decoder(&mut self, dec: Option<Decoder>) {
-        self.decoder = dec;
+    pub(crate) fn set_encoding(&mut self, encoding: Option<&'static Encoding>) {
+        self.decoder = encoding.map(|e| e.new_decoder_without_bom_handling());
         self.done = false;
     }
 
@@ -197,7 +197,7 @@ impl DocumentParser {
         Ok(())
     }
 
-    fn handle_bytes_start(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
+    fn create_element(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
         let mut_doc = &mut self.document;
         let full_name = String::from_utf8(ev.name().to_vec())?;
         let element = Element::new(mut_doc, full_name);
@@ -226,7 +226,7 @@ impl DocumentParser {
         match event {
             Event::Start(ref ev) => {
                 let parent = *self.element_stack.last().unwrap();
-                let element = self.handle_bytes_start(parent, ev)?;
+                let element = self.create_element(parent, ev)?;
                 self.element_stack.push(element);
                 Ok(false)
             }
@@ -243,7 +243,7 @@ impl DocumentParser {
             }
             Event::Empty(ref ev) => {
                 let parent = *self.element_stack.last().unwrap();
-                self.handle_bytes_start(parent, ev)?;
+                self.create_element(parent, ev)?;
                 Ok(false)
             }
             Event::Text(ev) => {
@@ -287,12 +287,13 @@ impl DocumentParser {
         }
     }
 
-    // Look at the document decl and figure out the document encoding
-    fn parse_start<B: Read>(&mut self, reader: B) -> Result<()> {
-        let mut decodereader = DecodeReader::new(reader, None);
-
+    // Sniff encoding and consume BOM
+    fn sniff_encoding<R: Read>(
+        &mut self,
+        decodereader: &mut DecodeReader<R>,
+    ) -> Result<Option<&'static Encoding>> {
         let bytes = decodereader.fill_buf()?;
-        let init_encoding = match bytes {
+        let encoding = match bytes {
             [0x3c, 0x3f, ..] => None, // UTF-8 '<?'
             [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
             [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
@@ -317,10 +318,18 @@ impl DocumentParser {
             [0x3c, 0x00, 0x3f, 0x00, ..] => Some(UTF_16LE),
             _ => None, // Try decoding it with UTF-8
         };
-        decodereader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
+        Ok(encoding)
+    }
+
+    // Look at the document decl and figure out the document encoding
+    fn parse_start<R: Read>(&mut self, reader: R) -> Result<()> {
+        let mut decodereader = DecodeReader::new(reader, None);
+        let init_encoding = self.sniff_encoding(&mut decodereader)?;
+        decodereader.set_encoding(init_encoding);
         let mut xmlreader = Reader::from_reader(decodereader);
         xmlreader.trim_text(true);
-        let mut buf = Vec::with_capacity(150);
+
+        let mut buf = Vec::with_capacity(200);
         let event = xmlreader.read_event(&mut buf)?;
         if let Event::Decl(ev) = event {
             self.handle_decl(&ev)?;
@@ -329,8 +338,7 @@ impl DocumentParser {
                 && !(self.encoding == Some(UTF_16LE) && init_encoding == Some(UTF_16BE))
             {
                 let mut decode_reader = xmlreader.into_underlying_reader();
-                decode_reader
-                    .set_decoder(self.encoding.map(|e| e.new_decoder_without_bom_handling()));
+                decode_reader.set_encoding(self.encoding);
                 xmlreader = Reader::from_reader(decode_reader);
                 xmlreader.trim_text(true);
             }
@@ -338,13 +346,10 @@ impl DocumentParser {
             return Err(Error::MalformedXML(
                 "Didn't find XML Declaration at the start of file".to_string(),
             ));
-        } else if let Event::Eof = event {
-            return Err(Error::MalformedXML(
-                "Didn't find XML Declaration at the start of file".to_string(),
-            ));
-        } else {
-            self.handle_event(event)?;
+        } else if self.handle_event(event)? {
+            return Ok(());
         }
+        // Handle rest of the events
         self.parse_content(xmlreader)
     }
 
