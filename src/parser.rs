@@ -278,23 +278,23 @@ impl DocumentParser {
 
     // Look at the document decl and figure out the document encoding
     fn parse_start<B: Read>(&mut self, reader: B) -> Result<()> {
-        let mut bufreader = DecodeReader::new(reader, None);
+        let mut decodereader = DecodeReader::new(reader, None);
 
-        let bytes = bufreader.fill_buf()?;
+        let bytes = decodereader.fill_buf()?;
         let init_encoding = match bytes {
             [0xfe, 0xff, ..] => {
                 // UTF-16 BE BOM
-                bufreader.consume(2);
+                decodereader.consume(2);
                 Some(UTF_16BE)
             }
             [0xff, 0xfe, ..] => {
                 // UTF-16 LE BOM
-                bufreader.consume(2);
+                decodereader.consume(2);
                 Some(UTF_16LE)
             }
             [0xef, 0xbb, 0xbf, ..] => {
                 // UTF-8 BOM
-                bufreader.consume(3);
+                decodereader.consume(3);
                 None
             }
             [0x00, 0x3c, 0x00, 0x3f, ..] => Some(UTF_16BE),
@@ -308,8 +308,8 @@ impl DocumentParser {
              */
             _ => return Err(Error::CannotDecode), // TODO: allow having comments and text above Decl for Utf-8?
         };
-        bufreader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
-        let mut xmlreader = Reader::from_reader(bufreader);
+        decodereader.set_decoder(init_encoding.map(|e| e.new_decoder_without_bom_handling()));
+        let mut xmlreader = Reader::from_reader(decodereader);
         xmlreader.trim_text(true);
         let mut buf = Vec::with_capacity(150);
         let event = xmlreader.read_event(&mut buf)?;
