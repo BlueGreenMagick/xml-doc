@@ -4,6 +4,9 @@
 //!
 //! Reading from various encodings are supported, including UTF-16, ISO 8859-1, GBK and EUC-KR. (With the notable exception of UTF-32)
 //!
+//! The XML document is represented with [`Document`], [`Element`] and [`Node`].
+//!
+//!
 //! # Example
 //! ```
 //! use easy_xml::{Document, Element, Node};
@@ -30,6 +33,26 @@
 //!
 //! let xml = doc.write_str();
 //! ```
+//!
+//! Below example goes through the root element's children and removes all nodes that isn't `<conf>...</conf>`
+//! ```no_run
+//! use std::path::Path;
+//! use easy_xml::{Document, Node};
+//!
+//! let xml_file = Path::new("config.xml")
+//! let mut doc = Document::parse_file(&xml_file).unwrap();
+//! let root = doc.root_element().unwrap();
+//! for i, node in root.children(&doc).iter().enumerate() {
+//!     if let Node::Element(elem) = node {
+//!         if elem.name() == "conf" {
+//!             continue;
+//!         }
+//!     }
+//!     root.remove_child(&mut doc, node);
+//! }
+//! doc.write_file(&xml_file);
+//! ```
+//!
 
 mod document;
 mod element;

@@ -68,18 +68,13 @@ impl Node {
     }
 }
 
-/// Represents a XML document.
-///
-/// Use `parse_str()`, `parse_reader()`, `parse_file()` or `from_str()` to parse xml.
-///
-/// Use `write_str()`, `write()`, or `write_file()` to write xml.
+/// Represents a XML document or a document fragment.
 ///
 /// # Examples
 /// ```
 /// use easy_xml::Document;
-/// use std::str::FromStr; // Needed to use `Document::from_str()`.
 ///
-/// let mut doc = Document::from_str(r#"<?xml version="1.0" encoding="UTF-8"?>
+/// let mut doc = Document::parse_str(r#"<?xml version="1.0" encoding="UTF-8"?>
 /// <package>
 ///     <metadata>
 ///         <author>Lewis Carol</author>
@@ -143,14 +138,14 @@ impl Document {
         self.store.len() == 1
     }
 
-    /// Get first element of document.
-    pub fn root_element(&self) -> Option<Element> {
-        self.container.child_elements(self).get(0).copied()
-    }
-
     /// Get root nodes of document.
     pub fn root_nodes(&self) -> &Vec<Node> {
         self.container.children(self)
+    }
+
+    /// Get first root node that is an element.
+    pub fn root_element(&self) -> Option<Element> {
+        self.container.child_elements(self).get(0).copied()
     }
 
     /// Push a node to end of root nodes.
@@ -162,66 +157,54 @@ impl Document {
     }
 }
 
-/// Methods for reading xml.
+/// Below are methods for parsing xml.
+///
+/// Call `parse_*_with_opts` with custom [`ReadOptions`] to change parser behaviour.
+/// Otherwise, [`ReadOptions::default()`] is used.
+///
+/// # Errors
+///
+/// - [`Error::CannotDecode`]: Could not decode XML. XML declaration may have invalid encoding value.
+/// - [`Error::MalformedXML`]: Could not read XML.
+/// - [`Error::Io`]: IO Error
 impl Document {
-    /// Parse xml string. You can only call this from an empty document.
-    ///
-    /// # Errors
-    ///
-    /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_str(str: &str) -> Result<Document> {
         DocumentParser::parse_reader(str.as_bytes(), ReadOptions::default())
     }
-
     pub fn parse_str_with_opts(str: &str, opts: ReadOptions) -> Result<Document> {
         DocumentParser::parse_reader(str.as_bytes(), opts)
     }
 
-    /// Parse xml string from file.
-    ///
-    /// # Errors
-    ///
-    /// Returns Errors from [`Document::read_reader()`].
     pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Document> {
         let file = File::open(path)?;
         DocumentParser::parse_reader(file, ReadOptions::default())
     }
-
     pub fn parse_file_with_opts<P: AsRef<Path>>(path: P, opts: ReadOptions) -> Result<Document> {
         let file = File::open(path)?;
         DocumentParser::parse_reader(file, opts)
     }
 
-    /// Parse xml string from reader. You can only call this from an empty document.
-    ///
-    /// # Errors
-    ///
-    /// - [`Error::CannotDecode`]: Could not decode XML.
-    /// - [`Error::MalformedXML`]: Could not read XML.
-    /// - [`Error::Io`]: IO Error
     pub fn parse_reader<R: Read>(reader: R) -> Result<Document> {
         DocumentParser::parse_reader(reader, ReadOptions::default())
     }
-
     pub fn parse_reader_with_opts<R: Read>(reader: R, opts: ReadOptions) -> Result<Document> {
         DocumentParser::parse_reader(reader, opts)
     }
 }
-/// Methods for writing xml.
+/// Below are methods for writing xml.
+/// The XML will be written in UTF-8.
 impl Document {
     pub fn write_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let mut file = File::open(path)?;
         self.write(&mut file)
     }
 
-    /// Writes document as xml string.
     pub fn write_str(&self) -> Result<String> {
         let mut buf: Vec<u8> = Vec::with_capacity(200);
         self.write(&mut buf)?;
         Ok(String::from_utf8(buf)?)
     }
 
-    /// Write document to writer. Will be written in UTF-8.
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let container = self.container();
         let mut writer = Writer::new_with_indent(writer, b' ', 4);

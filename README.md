@@ -10,6 +10,9 @@ Features:
 - Elements stores reference to its parent element, so traveling up the tree is fast.
 - One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/easy-xml#performance).
 
+Due to its architecture, you can't exchange nodes or elements between documents. 
+If your project modifies multiple xml documents at the same time, this library may not be a good fit.
+
 ## Example
 
 ```rust

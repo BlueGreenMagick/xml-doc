@@ -91,7 +91,7 @@ impl<'a> ElementBuilder<'a> {
     }
 }
 
-/// Represents an XML element.
+/// Represents an XML element. It acts as a pointer to actual element data.
 ///
 /// This struct only contains a unique `usize` id and implements trait `Copy`.
 /// So you do not need to bother with having a reference.
@@ -120,6 +120,20 @@ impl Element {
     }
 
     /// Chain methods to build an element easily.
+    ///
+    /// # Example
+    /// ```
+    /// use easy_xml::{Document, Element, Node};
+    ///
+    /// let document = Document::new();
+    ///
+    /// let elem = Element::build(&mut doc, "root")
+    ///     .attribute("id", "main")
+    ///     .attribute("class", "main")
+    ///     .finish();
+    ///
+    /// document.push_root_node(elem.as_node());
+    /// ```
     pub fn build<S: Into<String>>(document: &mut Document, name: S) -> ElementBuilder {
         let element = Self::new(document, name);
         ElementBuilder::new(element, document)
@@ -166,6 +180,7 @@ impl Element {
         self.id == 0
     }
 
+    /// Equivalent to `Node::Element(self)`
     pub fn as_node(&self) -> Node {
         Node::Element(*self)
     }
@@ -274,9 +289,13 @@ impl Element {
         &self.data(document).attributes
     }
 
+    pub fn attribute<'a>(&self, document: &'a Document, name: &str) -> Option<&'a str> {
+        self.attributes(document).get(name).map(|v| v.as_str())
+    }
+
     /// Add or set attribute.
     ///
-    /// `name` should not contain a `:`,
+    /// If `name` contains a `:`,
     /// or everything before `:` will be interpreted as namespace prefix.
     pub fn set_attribute<S, T>(&self, document: &mut Document, name: S, value: T)
     where
@@ -302,6 +321,8 @@ impl Element {
     }
 
     /// Gets HashMap of `xmlns:prefix=namespace` declared in this element's attributes.
+    ///
+    /// Default namespace has empty string as key.
     pub fn namespace_decls<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
         &self.data(document).namespace_decls
     }
@@ -431,7 +452,7 @@ impl Element {
             .collect()
     }
 
-    /// Find first element with name `name`.
+    /// Find first direct child element with name `name`.
     pub fn find(&self, document: &Document, name: &str) -> Option<Element> {
         self.children(document)
             .iter()
@@ -440,7 +461,7 @@ impl Element {
             .next()
     }
 
-    /// Find first element with name `name`.
+    /// Find all direct child element with name `name`.
     /// If you care about performance, call `self.children().iter().filter()`
     pub fn find_all(&self, document: &Document, name: &str) -> Vec<Element> {
         self.children(document)
@@ -455,13 +476,22 @@ impl Element {
 ///
 /// Because an element has reference to both its parent and its children,
 /// an element's parent and children is not directly exposed for modification.
-///
 /// But in return, it is not possible for a document to be in an inconsistant state,
 /// where an element's parent doesn't have the element as its children.
+///
+/// # Errors
+///
+/// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
+/// call `element.detatch()` to make it parentless first.
+/// This is to make it explicit that you are changing an element's parent, not adding another.
+/// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
+///
 impl Element {
     /// Equivalent to `vec.push()`.
     ///
     /// # Errors
+    ///
+    /// These errors are shared by below methods.
     ///
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
@@ -488,11 +518,9 @@ impl Element {
 
     /// Equivalent to `vec.insert()`.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
-    /// Call `elem.detatch()` before.
-    /// - [`Error::ContainerCannotMove`]: `node` cannot be container node.
+    /// Panics if `index > self.children().len()`
     pub fn insert_child(&self, document: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {
@@ -512,7 +540,7 @@ impl Element {
     ///
     /// # Panics
     ///
-    /// Panics if index is our of bounds.
+    /// Panics if `index >= self.children().len()`.
     pub fn remove_child(&self, document: &mut Document, index: usize) -> Node {
         let node = self.mut_data(document).children.remove(index);
         if let Node::Element(elem) = node {
@@ -544,6 +572,7 @@ impl Element {
         Ok(())
     }
 
+    /// Remove all children
     pub fn clear_children(&self, document: &mut Document) {
         let children = &mut self.mut_data(document).children;
         for _ in 0..children.len() {
@@ -551,7 +580,7 @@ impl Element {
         }
     }
 
-    /// Removes itself from its parent. Note that you can't add this element to other documents.
+    /// Removes itself from its parent. Note that you can't attach this element to other documents.
     ///
     /// # Errors
     ///
@@ -572,7 +601,6 @@ impl Element {
 #[cfg(test)]
 mod tests {
     use super::Document;
-    use std::str::FromStr;
 
     #[test]
     fn test_children() {
@@ -590,7 +618,7 @@ mod tests {
             </after>
         </outer>
         "#;
-        let doc = Document::from_str(xml).unwrap();
+        let doc = Document::parse_str(xml).unwrap();
         let outer = doc.container().child_elements(&doc)[0];
         let middle = outer.child_elements(&doc)[0];
         let inner = middle.child_elements(&doc)[0];
@@ -621,7 +649,7 @@ mod tests {
                 World!
             </p:bar>
         </root>"#;
-        let doc = Document::from_str(xml).unwrap();
+        let doc = Document::parse_str(xml).unwrap();
         let container = doc.container().children(&doc)[0].as_element().unwrap();
         let child_elements = container.child_elements(&doc);
         let foo = *child_elements.get(0).unwrap();
@@ -650,7 +678,7 @@ mod tests {
             <b>Text2</b>
         </core>
         "#;
-        let doc = Document::from_str(xml).unwrap();
+        let doc = Document::parse_str(xml).unwrap();
         assert_eq!(
             doc.root_element()
                 .unwrap()
