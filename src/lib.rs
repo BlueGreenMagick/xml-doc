@@ -39,16 +39,23 @@
 //! use std::path::Path;
 //! use easy_xml::{Document, Node};
 //!
-//! let xml_file = Path::new("config.xml")
+//! let xml_file = Path::new("config.xml");
 //! let mut doc = Document::parse_file(&xml_file).unwrap();
 //! let root = doc.root_element().unwrap();
-//! for i, node in root.children(&doc).iter().enumerate() {
-//!     if let Node::Element(elem) = node {
-//!         if elem.name() == "conf" {
-//!             continue;
+//! let to_remove: Vec<usize> = root.children(&doc)
+//!     .iter()
+//!     .enumerate()
+//!     .filter_map(|(i, node)| {
+//!         if let Node::Element(elem) = node {
+//!             if elem.name(&doc) == "conf" {
+//!                 return None
+//!             }
 //!         }
-//!     }
-//!     root.remove_child(&mut doc, node);
+//!         Some(i)
+//!     })
+//!     .collect();
+//! for i in to_remove.iter().rev() {
+//!     root.remove_child(&mut doc, *i);
 //! }
 //! doc.write_file(&xml_file);
 //! ```

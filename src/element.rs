@@ -125,9 +125,9 @@ impl Element {
     /// ```
     /// use easy_xml::{Document, Element, Node};
     ///
-    /// let document = Document::new();
+    /// let mut document = Document::new();
     ///
-    /// let elem = Element::build(&mut doc, "root")
+    /// let elem = Element::build(&mut document, "root")
     ///     .attribute("id", "main")
     ///     .attribute("class", "main")
     ///     .finish();
@@ -572,6 +572,16 @@ impl Element {
         Ok(())
     }
 
+    pub fn pop_child(&self, document: &mut Document) -> Option<Node> {
+        let child = self.mut_data(document).children.pop();
+        if let Some(node) = &child {
+            if let &Node::Element(elem) = node {
+                elem.mut_data(document).parent = None;
+            }
+        }
+        child
+    }
+
     /// Remove all children
     pub fn clear_children(&self, document: &mut Document) {
         let children = &mut self.mut_data(document).children;
@@ -600,7 +610,7 @@ impl Element {
 
 #[cfg(test)]
 mod tests {
-    use super::Document;
+    use super::{Document, Element, Node};
 
     #[test]
     fn test_children() {
@@ -696,5 +706,62 @@ mod tests {
             "Text2"
         );
         assert_eq!(doc.root_element().unwrap().text_content(&doc), "TextText2")
+    }
+
+    #[test]
+    fn test_mutate_tree() {
+        // Test tree consistency after mutating tree
+        let mut doc = Document::new();
+        let container = doc.container();
+        assert_eq!(container.parent(&doc), None);
+        assert_eq!(container.children(&doc).len(), 0);
+
+        // Element::build.push_to
+        let root = Element::build(&mut doc, "root").push_to(container);
+        assert_eq!(root.parent(&doc).unwrap(), container);
+        assert_eq!(doc.root_element().unwrap(), root);
+
+        // Element::new
+        let a = Element::new(&mut doc, "a");
+        assert_eq!(a.parent(&doc), None);
+
+        // Element.push_child
+        root.push_child(&mut doc, Node::Element(a)).unwrap();
+        assert_eq!(root.children(&doc)[0].as_element().unwrap(), a);
+        assert_eq!(a.parent(&doc).unwrap(), root);
+
+        // Element.pop
+        let popped = root.pop_child(&mut doc).unwrap().as_element().unwrap();
+        assert_eq!(popped, a);
+        assert_eq!(root.children(&doc).len(), 0);
+        assert_eq!(a.parent(&doc), None);
+
+        // Element.push_to
+        let a = Element::new(&mut doc, "a");
+        a.push_to(&mut doc, root).unwrap();
+        assert_eq!(root.children(&doc)[0].as_element().unwrap(), a);
+        assert_eq!(a.parent(&doc).unwrap(), root);
+
+        // Element.remove_child_elem
+        root.remove_child_elem(&mut doc, a).unwrap();
+        assert_eq!(root.children(&doc).len(), 0);
+        assert_eq!(a.parent(&doc), None);
+
+        // Element.insert_child
+        let a = Element::new(&mut doc, "a");
+        root.insert_child(&mut doc, 0, Node::Element(a)).unwrap();
+        assert_eq!(root.children(&doc)[0].as_element().unwrap(), a);
+        assert_eq!(a.parent(&doc).unwrap(), root);
+
+        // Element.remove_child
+        root.remove_child(&mut doc, 0);
+        assert_eq!(root.children(&doc).len(), 0);
+        assert_eq!(a.parent(&doc), None);
+
+        // Element.detatch
+        let a = Element::build(&mut doc, "a").push_to(root);
+        a.detatch(&mut doc).unwrap();
+        assert_eq!(root.children(&doc).len(), 0);
+        assert_eq!(a.parent(&doc), None);
     }
 }
