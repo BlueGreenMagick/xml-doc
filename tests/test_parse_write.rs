@@ -134,6 +134,7 @@ where
         let read_options = ReadOptions {
             empty_text_node: *k[0],
             require_decl: true,
+            encoding: None,
         };
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);

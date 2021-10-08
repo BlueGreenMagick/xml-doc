@@ -124,11 +124,16 @@ impl<R: Read> BufRead for DecodeReader<R> {
 /// `empty_text_node`: true - <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 ///
 /// `require_decl`: true - Returns error if document doesn't start with XML declaration.
-/// If this is set to false, the parser won't be able to decode encodings other than UTF-8.
+/// If this is set to false, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
+///
+/// `encoding`: None - If this is set, the parser will start reading with this encoding.
+/// But it will switch to XML declaration's encoding value if it has a different value.
+/// See [`encoding_rs::Encoding::for_label`] for valid values.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
     pub empty_text_node: bool,
     pub require_decl: bool,
+    pub encoding: Option<String>,
 }
 
 impl ReadOptions {
@@ -136,6 +141,7 @@ impl ReadOptions {
         ReadOptions {
             empty_text_node: true,
             require_decl: true,
+            encoding: None,
         }
     }
 }
@@ -294,10 +300,6 @@ impl DocumentParser {
         let bytes = decodereader.fill_buf()?;
         let encoding = match bytes {
             [0x3c, 0x3f, ..] => None, // UTF-8 '<?'
-            [0x00, 0x00, 0xfe, 0xff, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0xff, 0xfe, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
-            [0x00, 0x00, 0x00, 0x3c, ..] => return Err(Error::CannotDecode), // UTF-32 BE
-            [0x3c, 0x00, 0x00, 0x00, ..] => return Err(Error::CannotDecode), // UTF-32 LE
             [0xfe, 0xff, ..] => {
                 // UTF-16 BE BOM
                 decodereader.consume(2);
@@ -323,7 +325,10 @@ impl DocumentParser {
     // Look at the document decl and figure out the document encoding
     fn parse_start<R: Read>(&mut self, reader: R) -> Result<()> {
         let mut decodereader = DecodeReader::new(reader, None);
-        let init_encoding = self.sniff_encoding(&mut decodereader)?;
+        let mut init_encoding = self.sniff_encoding(&mut decodereader)?;
+        if let Some(enc) = &self.read_opts.encoding {
+            init_encoding = Some(Encoding::for_label(enc.as_bytes()).ok_or(Error::CannotDecode)?)
+        }
         decodereader.set_encoding(init_encoding);
         let mut xmlreader = Reader::from_reader(decodereader);
         xmlreader.trim_text(true);
