@@ -111,7 +111,7 @@ impl Document {
             counter: 1, // because container is id 0
             store: vec![container_data],
             container,
-            version: String::new(), // will be changed later
+            version: String::from("1.0"),
             standalone: false,
         }
     }
@@ -256,7 +256,8 @@ impl Document {
         let name_bytes = element.full_name(self).as_bytes();
         let mut start = BytesStart::borrowed_name(name_bytes);
         for (key, val) in element.attributes(self) {
-            start.push_attribute((key.as_bytes(), val.as_bytes()));
+            let val = quick_xml::escape::escape(val.as_bytes());
+            start.push_attribute((key.as_bytes(), &val[..]));
         }
         for (prefix, val) in element.namespace_decls(self) {
             let attr_name = if prefix.is_empty() {
@@ -264,7 +265,8 @@ impl Document {
             } else {
                 format!("xmlns:{}", prefix)
             };
-            start.push_attribute((attr_name.as_bytes(), val.as_bytes()));
+            let val = quick_xml::escape::escape(val.as_bytes());
+            start.push_attribute((attr_name.as_bytes(), &val[..]));
         }
         if element.has_children(self) {
             writer.write_event(Event::Start(start))?;
