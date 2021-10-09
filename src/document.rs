@@ -70,6 +70,12 @@ impl Node {
 
 /// Represents a XML document or a document fragment.
 ///
+/// To build a document from scratch, use [`Document::new`].
+///
+/// To read and modify an existing document, use [parse_*](`Document#parsing`) methods.
+///
+/// To write the document, use [write_*](`Document#writing`) methods.
+///
 /// # Examples
 /// ```
 /// use xml_doc::Document;
@@ -157,13 +163,16 @@ impl Document {
     }
 }
 
+/// &nbsp;
+/// # Parsing
+///
 /// Below are methods for parsing xml.
+/// Parsing from string, file, and reader is supported.
 ///
 /// Call `parse_*_with_opts` with custom [`ReadOptions`] to change parser behaviour.
 /// Otherwise, [`ReadOptions::default()`] is used.
 ///
 /// # Errors
-///
 /// - [`Error::CannotDecode`]: Could not decode XML. XML declaration may have invalid encoding value.
 /// - [`Error::MalformedXML`]: Could not read XML.
 /// - [`Error::Io`]: IO Error
@@ -215,6 +224,9 @@ impl WriteOptions {
     }
 }
 
+/// &nbsp;
+/// # Writing
+///
 /// Below are methods for writing xml.
 /// The XML will be written in UTF-8.
 impl Document {

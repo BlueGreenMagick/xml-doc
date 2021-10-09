@@ -91,7 +91,7 @@ impl<'a> ElementBuilder<'a> {
     }
 }
 
-/// Represents an XML element. It acts as a pointer to actual element data.
+/// Represents an XML element. It acts as a pointer to actual element data stored in Document.
 ///
 /// This struct only contains a unique `usize` id and implements trait `Copy`.
 /// So you do not need to bother with having a reference.
@@ -99,11 +99,12 @@ impl<'a> ElementBuilder<'a> {
 /// Because the actual data of the element is stored in [`Document`],
 /// most methods takes `&Document` or `&mut Document` as its first argument.
 ///
-/// Note that an element can only interact with elements of the same document.
+/// Note that an element may only interact with elements of the same document,
+/// but the crate doesn't know which document an element is from.
+///
 /// If you for example attempt to call `.remove_child_elem()` with elements from other document,
 /// unexpected errors may occur, or may panic.
 /// You also can't move elements between documents.
-///
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Element {
@@ -120,6 +121,7 @@ impl Element {
     }
 
     /// Chain methods to build an element easily.
+    /// The chain can be finished with `.finish()` or `.push_to(parent)`.
     ///
     /// # Example
     /// ```
@@ -212,6 +214,7 @@ impl Element {
     }
 
     /// Get full name of element, including its namespace prefix.
+    /// Use [`Element::name()`] to get its name without the prefix.
     pub fn full_name<'a>(&self, doc: &'a Document) -> &'a str {
         &self.data(doc).full_name
     }
@@ -238,6 +241,8 @@ impl Element {
     ///
     /// `prefix` should not have a `:`,
     /// or everything after `:` will be interpreted as part of element name.    
+    ///
+    /// If prefix is an empty string, removes prefix.
     pub fn set_prefix<S: Into<String>>(&self, doc: &mut Document, prefix: S) {
         let data = self.mut_data(doc);
         let (_, name) = Self::separate_prefix_name(&data.full_name);
@@ -245,6 +250,7 @@ impl Element {
     }
 
     /// Get name of element, without its namespace prefix.
+    /// Use `Element::full_name()` to get its full name with prefix.
     ///
     /// `<prefix:name>` -> `"name"`
     pub fn name<'a>(&self, doc: &'a Document) -> &'a str {
@@ -474,21 +480,14 @@ impl Element {
 ///
 /// # Errors
 ///
+/// These errors are shared by below methods.
+///
 /// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
 /// call `element.detatch()` to make it parentless first.
 /// This is to make it explicit that you are changing an element's parent, not adding another.
 /// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
-///
 impl Element {
     /// Equivalent to `vec.push()`.
-    ///
-    /// # Errors
-    ///
-    /// These errors are shared by below methods.
-    ///
-    /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
-    /// Call `elem.detatch()` before.
-    /// - [`Error::ContainerCannotMove`]: `node` cannot be container node.
     pub fn push_child(&self, doc: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {

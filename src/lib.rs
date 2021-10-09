@@ -2,7 +2,7 @@
 //!
 //! It was especially designed for modifying xml files without rigid structure.
 //!
-//! Reading from various encodings are supported, including UTF-16, ISO 8859-1, GBK and EUC-KR. (With the notable exception of UTF-32)
+//! Parsing from various encodings are supported, including UTF-16, ISO 8859-1, GBK and EUC-KR. (With the notable exception of UTF-32)
 //!
 //! The XML document is represented with [`Document`], [`Element`] and [`Node`].
 //!
@@ -23,9 +23,9 @@
 //! let metadata = doc.root_element().unwrap();
 //!
 //! // Add a new element
-//! let series = Element::new(&mut doc, "series");
-//! series.set_text_content(&mut doc, "Lord of the Rings");
-//! metadata.push_child(&mut doc, Node::Element(series));
+//! let series = Element::build(&mut doc, "series")
+//!     .text_content("Lord of the Rings")
+//!     .push_to(metadata);
 //!
 //! // Modify existing element
 //! let date = metadata.find(&doc, "date").unwrap();
