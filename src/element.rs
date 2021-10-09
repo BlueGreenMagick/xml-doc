@@ -258,7 +258,7 @@ impl Element {
     pub fn set_name<S: Into<String>>(&self, doc: &mut Document, name: S) {
         let data = self.mut_data(doc);
         let (prefix, _) = Self::separate_prefix_name(&data.full_name);
-        if prefix == "" {
+        if prefix.is_empty() {
             data.full_name = name.into();
         } else {
             data.full_name = format!("{}:{}", prefix, name.into());
@@ -352,7 +352,7 @@ impl Element {
     }
 
     pub(crate) fn build_text_content<'a>(&self, doc: &'a Document, buf: &'a mut String) {
-        for child in self.children(&doc) {
+        for child in self.children(doc) {
             child.build_text_content(doc, buf);
         }
     }
@@ -447,8 +447,7 @@ impl Element {
         self.children(doc)
             .iter()
             .filter_map(|n| n.as_element())
-            .filter(|e| e.name(doc) == name)
-            .next()
+            .find(|e| e.name(doc) == name)
     }
 
     /// Find all direct child element with name `name`.
@@ -564,10 +563,8 @@ impl Element {
 
     pub fn pop_child(&self, doc: &mut Document) -> Option<Node> {
         let child = self.mut_data(doc).children.pop();
-        if let Some(node) = &child {
-            if let &Node::Element(elem) = node {
-                elem.mut_data(doc).parent = None;
-            }
+        if let Some(Node::Element(elem)) = &child {
+            elem.mut_data(doc).parent = None;
         }
         child
     }

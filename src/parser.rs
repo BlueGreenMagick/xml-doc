@@ -164,7 +164,7 @@ impl DocumentParser {
         let doc = Document::new();
         let element_stack = vec![doc.container()];
         let mut parser = DocumentParser {
-            doc: doc,
+            doc,
             read_opts: opts,
             encoding: None,
             element_stack: element_stack,
@@ -245,7 +245,7 @@ impl DocumentParser {
                 let elem = self.element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
                 if self.read_opts.empty_text_node {
                     // distinguish <tag></tag> and <tag />
-                    if !elem.has_children(&mut self.doc) {
+                    if !elem.has_children(&self.doc) {
                         elem.push_child(&mut self.doc, Node::Text(String::new()))
                             .unwrap();
                     }
@@ -384,8 +384,8 @@ pub fn normalize_space(bytes: &[u8]) -> Vec<u8> {
     let mut normalized = Vec::with_capacity(bytes.len());
     let mut char_found = false;
     let mut last_space = false;
-    for i in 0..bytes.len() {
-        match bytes[i] {
+    for &byte in bytes {
+        match byte {
             b'\r' | b'\n' | b'\t' | b' ' => {
                 if char_found && !last_space {
                     normalized.push(b' ');

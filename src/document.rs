@@ -61,7 +61,7 @@ impl Node {
     /// If node is `Element`, return [Element::text_content()]
     ///
     /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-    pub fn text_content<'a>(&self, doc: &'a Document) -> String {
+    pub fn text_content(&self, doc: &Document) -> String {
         let mut buf = String::new();
         self.build_text_content(doc, &mut buf);
         buf
