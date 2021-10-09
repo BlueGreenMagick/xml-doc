@@ -237,13 +237,19 @@ impl DocumentParser {
 
         match event {
             Event::Start(ref ev) => {
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 let element = self.create_element(parent, ev)?;
                 self.element_stack.push(element);
                 Ok(false)
             }
             Event::End(_) => {
-                let elem = self.element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
+                let elem = self
+                    .element_stack
+                    .pop()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?; // quick-xml checks if tag names match for us
                 if self.read_opts.empty_text_node {
                     // distinguish <tag></tag> and <tag />
                     if !elem.has_children(&self.doc) {
@@ -254,21 +260,30 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::Empty(ref ev) => {
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 self.create_element(parent, ev)?;
                 Ok(false)
             }
             Event::Text(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::Text(content);
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::DocType(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::DocType(content);
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
@@ -276,21 +291,30 @@ impl DocumentParser {
             Event::Comment(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Comment(content);
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::CData(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::CData(content);
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::PI(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::PI(content);
-                let parent = *self.element_stack.last().unwrap();
+                let parent = *self
+                    .element_stack
+                    .last()
+                    .ok_or_else(|| Error::MalformedXML("Malformed Element Tree".to_string()))?;
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
