@@ -153,7 +153,7 @@ impl ReadOptions {
 
 //TODO: don't unwrap element_stack.last() or pop(). Invalid XML file can crash the software.
 pub(crate) struct DocumentParser {
-    document: Document,
+    doc: Document,
     read_opts: ReadOptions,
     encoding: Option<&'static Encoding>,
     element_stack: Vec<Element>,
@@ -164,17 +164,17 @@ impl DocumentParser {
         let doc = Document::new();
         let element_stack = vec![doc.container()];
         let mut parser = DocumentParser {
-            document: doc,
+            doc: doc,
             read_opts: opts,
             encoding: None,
             element_stack: element_stack,
         };
         parser.parse_start(reader)?;
-        Ok(parser.document)
+        Ok(parser.doc)
     }
 
     fn handle_decl(&mut self, ev: &BytesDecl) -> Result<()> {
-        self.document.version = String::from_utf8(ev.version()?.to_vec())?;
+        self.doc.version = String::from_utf8(ev.version()?.to_vec())?;
         self.encoding = match ev.encoding() {
             Some(res) => {
                 let encoding = Encoding::for_label(&res?).ok_or(Error::CannotDecode)?;
@@ -186,7 +186,7 @@ impl DocumentParser {
             }
             None => None,
         };
-        self.document.standalone = match ev.standalone() {
+        self.doc.standalone = match ev.standalone() {
             Some(res) => {
                 let val = std::str::from_utf8(&res?)?.to_lowercase();
                 match val.as_str() {
@@ -205,7 +205,7 @@ impl DocumentParser {
     }
 
     fn create_element(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
-        let mut_doc = &mut self.document;
+        let mut_doc = &mut self.doc;
         let full_name = String::from_utf8(ev.name().to_vec())?;
         let element = Element::new(mut_doc, full_name);
         let mut namespaces = HashMap::new();
@@ -245,8 +245,8 @@ impl DocumentParser {
                 let elem = self.element_stack.pop().unwrap(); // quick-xml checks if tag names match for us
                 if self.read_opts.empty_text_node {
                     // distinguish <tag></tag> and <tag />
-                    if !elem.has_children(&mut self.document) {
-                        elem.push_child(&mut self.document, Node::Text(String::new()))
+                    if !elem.has_children(&mut self.doc) {
+                        elem.push_child(&mut self.doc, Node::Text(String::new()))
                             .unwrap();
                     }
                 }
@@ -261,14 +261,14 @@ impl DocumentParser {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::Text(content);
                 let parent = *self.element_stack.last().unwrap();
-                parent.push_child(&mut self.document, node).unwrap();
+                parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::DocType(ev) => {
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::DocType(content);
                 let parent = *self.element_stack.last().unwrap();
-                parent.push_child(&mut self.document, node).unwrap();
+                parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             // Comment, CData, and PI content is not escaped.
@@ -276,21 +276,21 @@ impl DocumentParser {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Comment(content);
                 let parent = *self.element_stack.last().unwrap();
-                parent.push_child(&mut self.document, node).unwrap();
+                parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::CData(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::CData(content);
                 let parent = *self.element_stack.last().unwrap();
-                parent.push_child(&mut self.document, node).unwrap();
+                parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::PI(ev) => {
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::PI(content);
                 let parent = *self.element_stack.last().unwrap();
-                parent.push_child(&mut self.document, node).unwrap();
+                parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
             Event::Decl(_) => Err(Error::MalformedXML(

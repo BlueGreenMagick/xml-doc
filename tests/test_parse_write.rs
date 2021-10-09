@@ -21,13 +21,13 @@ impl<'a> fmt::Debug for TStr {
     }
 }
 
-fn to_yaml(document: &Document) -> String {
+fn to_yaml(doc: &Document) -> String {
     let mut buf = String::new();
     let mut depth: usize = 0;
     write_line("Root:", depth, &mut buf);
     depth += 1;
-    let container = document.container();
-    render_nodes(document, container.children(&document), depth, &mut buf);
+    let container = doc.container();
+    render_nodes(doc, container.children(&doc), depth, &mut buf);
     buf
 }
 
@@ -104,9 +104,9 @@ fn get_expected(file_name: &str) -> TStr {
 
 // Documents and xml files are supposed to have a 1:1 relationship.
 // Then write is ok if read function is ok, and read(write(D)) == D
-fn test_write(document: &Document) -> TStr {
-    let expected = TStr(to_yaml(&document));
-    let written_xml = document.write_str().unwrap();
+fn test_write(doc: &Document) -> TStr {
+    let expected = TStr(to_yaml(&doc));
+    let written_xml = doc.write_str().unwrap();
     println!("{:?}", &written_xml);
     let new_doc = Document::from_str(&written_xml).unwrap();
     let result = TStr(to_yaml(&new_doc));
@@ -141,7 +141,7 @@ where
         let expected = get_expected(&expected_name);
 
         let result = match Document::parse_file_with_opts(&xml_file, read_options.clone()) {
-            Ok(document) => test_write(&document),
+            Ok(doc) => test_write(&doc),
             Err(error) => {
                 println!("{:?}", error);
                 let debug_str = format!("{:?}", error);

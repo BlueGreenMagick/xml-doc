@@ -47,9 +47,9 @@ impl Node {
         }
     }
 
-    pub(crate) fn build_text_content<'a>(&self, document: &'a Document, buf: &'a mut String) {
+    pub(crate) fn build_text_content<'a>(&self, doc: &'a Document, buf: &'a mut String) {
         match self {
-            Node::Element(elem) => elem.build_text_content(document, buf),
+            Node::Element(elem) => elem.build_text_content(doc, buf),
             Node::Text(text) => buf.push_str(text),
             Node::CData(text) => buf.push_str(text),
             Node::PI(text) => buf.push_str(text),
@@ -61,9 +61,9 @@ impl Node {
     /// If node is `Element`, return [Element::text_content()]
     ///
     /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-    pub fn text_content<'a>(&self, document: &'a Document) -> String {
+    pub fn text_content<'a>(&self, doc: &'a Document) -> String {
         let mut buf = String::new();
-        self.build_text_content(document, &mut buf);
+        self.build_text_content(doc, &mut buf);
         buf
     }
 }
@@ -149,7 +149,7 @@ impl Document {
     }
 
     /// Push a node to end of root nodes.
-    /// If document has no [`Element`], pushing a [`Node::Element`] is
+    /// If doc has no [`Element`], pushing a [`Node::Element`] is
     /// equivalent to setting it as root element.
     pub fn push_root_node(&mut self, node: Node) -> Result<()> {
         let elem = self.container;
@@ -299,21 +299,14 @@ mod tests {
             <c />
         </basic>
         "#;
-        let mut document = Document::from_str(xml).unwrap();
-        let basic = document.container().children(&document)[0]
-            .as_element()
-            .unwrap();
-        let p = Element::new(&mut document, "p");
-        basic.push_child(&mut document, Node::Element(p)).unwrap();
-        assert_eq!(p.parent(&document).unwrap(), basic);
+        let mut doc = Document::from_str(xml).unwrap();
+        let basic = doc.container().children(&doc)[0].as_element().unwrap();
+        let p = Element::new(&mut doc, "p");
+        basic.push_child(&mut doc, Node::Element(p)).unwrap();
+        assert_eq!(p.parent(&doc).unwrap(), basic);
         assert_eq!(
             p,
-            basic
-                .children(&document)
-                .last()
-                .unwrap()
-                .as_element()
-                .unwrap()
+            basic.children(&doc).last().unwrap().as_element().unwrap()
         )
     }
 }

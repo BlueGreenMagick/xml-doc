@@ -115,8 +115,8 @@ impl Element {
     ///
     /// If full_name contains `:`,
     /// everything before that will be interpreted as a namespace prefix.
-    pub fn new<S: Into<String>>(document: &mut Document, full_name: S) -> Self {
-        Self::with_data(document, full_name.into(), HashMap::new(), HashMap::new())
+    pub fn new<S: Into<String>>(doc: &mut Document, full_name: S) -> Self {
+        Self::with_data(doc, full_name.into(), HashMap::new(), HashMap::new())
     }
 
     /// Chain methods to build an element easily.
@@ -125,29 +125,27 @@ impl Element {
     /// ```
     /// use easy_xml::{Document, Element, Node};
     ///
-    /// let mut document = Document::new();
+    /// let mut doc = Document::new();
     ///
-    /// let elem = Element::build(&mut document, "root")
+    /// let elem = Element::build(&mut doc, "root")
     ///     .attribute("id", "main")
     ///     .attribute("class", "main")
     ///     .finish();
     ///
-    /// document.push_root_node(elem.as_node());
+    /// doc.push_root_node(elem.as_node());
     /// ```
-    pub fn build<S: Into<String>>(document: &mut Document, name: S) -> ElementBuilder {
-        let element = Self::new(document, name);
-        ElementBuilder::new(element, document)
+    pub fn build<S: Into<String>>(doc: &mut Document, name: S) -> ElementBuilder {
+        let element = Self::new(doc, name);
+        ElementBuilder::new(element, doc)
     }
 
     pub(crate) fn with_data(
-        document: &mut Document,
+        doc: &mut Document,
         full_name: String,
         attributes: HashMap<String, String>,
         namespace_decls: HashMap<String, String>,
     ) -> Element {
-        let elem = Element {
-            id: document.counter,
-        };
+        let elem = Element { id: doc.counter };
         let elem_data = ElementData {
             full_name,
             attributes,
@@ -155,8 +153,8 @@ impl Element {
             parent: None,
             children: vec![],
         };
-        document.store.push(elem_data);
-        document.counter += 1;
+        doc.store.push(elem_data);
+        doc.counter += 1;
         elem
     }
 
@@ -198,12 +196,12 @@ impl Element {
 
 /// Below are methods that take `&Document` as its first argument.
 impl Element {
-    fn data<'a>(&self, document: &'a Document) -> &'a ElementData {
-        document.store.get(self.id).unwrap()
+    fn data<'a>(&self, doc: &'a Document) -> &'a ElementData {
+        doc.store.get(self.id).unwrap()
     }
 
-    fn mut_data<'a>(&self, document: &'a mut Document) -> &'a mut ElementData {
-        document.store.get_mut(self.id).unwrap()
+    fn mut_data<'a>(&self, doc: &'a mut Document) -> &'a mut ElementData {
+        doc.store.get_mut(self.id).unwrap()
     }
 
     /// Returns true if this element is the root node of document.
@@ -214,34 +212,34 @@ impl Element {
     }
 
     /// Get full name of element, including its namespace prefix.
-    pub fn full_name<'a>(&self, document: &'a Document) -> &'a str {
-        &self.data(document).full_name
+    pub fn full_name<'a>(&self, doc: &'a Document) -> &'a str {
+        &self.data(doc).full_name
     }
 
-    pub fn set_full_name<S: Into<String>>(&self, document: &mut Document, name: S) {
-        self.mut_data(document).full_name = name.into();
+    pub fn set_full_name<S: Into<String>>(&self, doc: &mut Document, name: S) {
+        self.mut_data(doc).full_name = name.into();
     }
 
     /// Get prefix and name of element.
     ///
     /// `<prefix: name` -> `("prefix", "name")`
-    pub fn prefix_name<'a>(&self, document: &'a Document) -> (&'a str, &'a str) {
-        Self::separate_prefix_name(self.full_name(document))
+    pub fn prefix_name<'a>(&self, doc: &'a Document) -> (&'a str, &'a str) {
+        Self::separate_prefix_name(self.full_name(doc))
     }
 
     /// Get namespace prefix of element, without name.
     ///
     /// `<prefix:name>` -> `"prefix"`
-    pub fn prefix<'a>(&self, document: &'a Document) -> &'a str {
-        self.prefix_name(document).0
+    pub fn prefix<'a>(&self, doc: &'a Document) -> &'a str {
+        self.prefix_name(doc).0
     }
 
     /// Set prefix of element, preserving its name.
     ///
     /// `prefix` should not have a `:`,
     /// or everything after `:` will be interpreted as part of element name.    
-    pub fn set_prefix<S: Into<String>>(&self, document: &mut Document, prefix: S) {
-        let data = self.mut_data(document);
+    pub fn set_prefix<S: Into<String>>(&self, doc: &mut Document, prefix: S) {
+        let data = self.mut_data(doc);
         let (_, name) = Self::separate_prefix_name(&data.full_name);
         data.full_name = format!("{}:{}", prefix.into(), name);
     }
@@ -249,16 +247,16 @@ impl Element {
     /// Get name of element, without its namespace prefix.
     ///
     /// `<prefix:name>` -> `"name"`
-    pub fn name<'a>(&self, document: &'a Document) -> &'a str {
-        self.prefix_name(document).1
+    pub fn name<'a>(&self, doc: &'a Document) -> &'a str {
+        self.prefix_name(doc).1
     }
 
     /// Set name of element, preserving its prefix.
     ///
     /// `name` should not have a `:`,
     /// or everything before `:` may be interpreted as namespace prefix.
-    pub fn set_name<S: Into<String>>(&self, document: &mut Document, name: S) {
-        let data = self.mut_data(document);
+    pub fn set_name<S: Into<String>>(&self, doc: &mut Document, name: S) {
+        let data = self.mut_data(doc);
         let (prefix, _) = Self::separate_prefix_name(&data.full_name);
         if prefix == "" {
             data.full_name = name.into();
@@ -285,148 +283,140 @@ impl Element {
     ///     // ("", "id"), ("pre", "name")
     /// }
     /// ```
-    pub fn attributes<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
-        &self.data(document).attributes
+    pub fn attributes<'a>(&self, doc: &'a Document) -> &'a HashMap<String, String> {
+        &self.data(doc).attributes
     }
 
-    pub fn attribute<'a>(&self, document: &'a Document, name: &str) -> Option<&'a str> {
-        self.attributes(document).get(name).map(|v| v.as_str())
+    pub fn attribute<'a>(&self, doc: &'a Document, name: &str) -> Option<&'a str> {
+        self.attributes(doc).get(name).map(|v| v.as_str())
     }
 
     /// Add or set attribute.
     ///
     /// If `name` contains a `:`,
     /// or everything before `:` will be interpreted as namespace prefix.
-    pub fn set_attribute<S, T>(&self, document: &mut Document, name: S, value: T)
+    pub fn set_attribute<S, T>(&self, doc: &mut Document, name: S, value: T)
     where
         S: Into<String>,
         T: Into<String>,
     {
-        self.mut_attributes(document)
-            .insert(name.into(), value.into());
+        self.mut_attributes(doc).insert(name.into(), value.into());
     }
 
-    pub fn mut_attributes<'a>(
-        &self,
-        document: &'a mut Document,
-    ) -> &'a mut HashMap<String, String> {
-        &mut self.mut_data(document).attributes
+    pub fn mut_attributes<'a>(&self, doc: &'a mut Document) -> &'a mut HashMap<String, String> {
+        &mut self.mut_data(doc).attributes
     }
 
     /// Gets the namespace of this element.
     ///
-    /// Shorthand for `self.namespace_for_prefix(document, self.prefix(document))`.
-    pub fn namespace<'a>(&self, document: &'a Document) -> Option<&'a str> {
-        self.namespace_for_prefix(document, self.prefix(document))
+    /// Shorthand for `self.namespace_for_prefix(doc, self.prefix(doc))`.
+    pub fn namespace<'a>(&self, doc: &'a Document) -> Option<&'a str> {
+        self.namespace_for_prefix(doc, self.prefix(doc))
     }
 
     /// Gets HashMap of `xmlns:prefix=namespace` declared in this element's attributes.
     ///
     /// Default namespace has empty string as key.
-    pub fn namespace_decls<'a>(&self, document: &'a Document) -> &'a HashMap<String, String> {
-        &self.data(document).namespace_decls
+    pub fn namespace_decls<'a>(&self, doc: &'a Document) -> &'a HashMap<String, String> {
+        &self.data(doc).namespace_decls
     }
 
     pub fn mut_namespace_decls<'a>(
         &self,
-        document: &'a mut Document,
+        doc: &'a mut Document,
     ) -> &'a mut HashMap<String, String> {
-        &mut self.mut_data(document).namespace_decls
+        &mut self.mut_data(doc).namespace_decls
     }
 
-    pub fn set_namespace_decl<S, T>(&self, document: &mut Document, prefix: S, namespace: T)
+    pub fn set_namespace_decl<S, T>(&self, doc: &mut Document, prefix: S, namespace: T)
     where
         S: Into<String>,
         T: Into<String>,
     {
-        self.mut_namespace_decls(document)
+        self.mut_namespace_decls(doc)
             .insert(prefix.into(), namespace.into());
     }
 
     // TODO: check out https://www.w3.org/TR/xml-names/#ns-decl
     // about xmlns and xml prefix
     /// Get namespace value given prefix, for this element.
-    pub fn namespace_for_prefix<'a>(
-        &self,
-        document: &'a Document,
-        prefix: &str,
-    ) -> Option<&'a str> {
+    pub fn namespace_for_prefix<'a>(&self, doc: &'a Document, prefix: &str) -> Option<&'a str> {
         let mut elem = *self;
         loop {
-            let data = elem.data(document);
+            let data = elem.data(doc);
             if let Some(value) = data.namespace_decls.get(prefix) {
                 return Some(value);
             }
-            elem = elem.parent(document)?;
+            elem = elem.parent(doc)?;
         }
     }
 
-    pub(crate) fn build_text_content<'a>(&self, document: &'a Document, buf: &'a mut String) {
-        for child in self.children(&document) {
-            child.build_text_content(document, buf);
+    pub(crate) fn build_text_content<'a>(&self, doc: &'a Document, buf: &'a mut String) {
+        for child in self.children(&doc) {
+            child.build_text_content(doc, buf);
         }
     }
 
     /// Concatenate all text content of this element, including its child elements `text_content()`.
     ///
     /// Implementation of [Node.textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-    pub fn text_content(&self, document: &Document) -> String {
+    pub fn text_content(&self, doc: &Document) -> String {
         let mut buf = String::new();
-        self.build_text_content(document, &mut buf);
+        self.build_text_content(doc, &mut buf);
         buf
     }
 
     /// Clears all its children and inserts a [`Node::Text`] with given text.
-    pub fn set_text_content<S: Into<String>>(&self, document: &mut Document, text: S) {
-        self.clear_children(document);
+    pub fn set_text_content<S: Into<String>>(&self, doc: &mut Document, text: S) {
+        self.clear_children(doc);
         let node = Node::Text(text.into());
-        self.mut_data(document).children.push(node);
+        self.mut_data(doc).children.push(node);
     }
 }
 
 /// Below are methods related to finding nodes in tree.
 impl Element {
-    pub fn parent(&self, document: &Document) -> Option<Element> {
-        self.data(document).parent
+    pub fn parent(&self, doc: &Document) -> Option<Element> {
+        self.data(doc).parent
     }
 
-    /// `self.parent(document).is_some()`
-    pub fn has_parent(&self, document: &Document) -> bool {
-        self.parent(document).is_some()
+    /// `self.parent(doc).is_some()`
+    pub fn has_parent(&self, doc: &Document) -> bool {
+        self.parent(doc).is_some()
     }
 
     /// Get child [`Node`]s of this element.
-    pub fn children<'a>(&self, document: &'a Document) -> &'a Vec<Node> {
-        &self.data(document).children
+    pub fn children<'a>(&self, doc: &'a Document) -> &'a Vec<Node> {
+        &self.data(doc).children
     }
 
-    fn _children_recursive<'a>(&self, document: &'a Document, nodes: &mut Vec<&'a Node>) {
-        for node in self.children(document) {
+    fn _children_recursive<'a>(&self, doc: &'a Document, nodes: &mut Vec<&'a Node>) {
+        for node in self.children(doc) {
             nodes.push(node);
             if let Node::Element(elem) = &node {
-                elem._children_recursive(document, nodes);
+                elem._children_recursive(doc, nodes);
             }
         }
     }
 
     /// Get all child nodes recursively. (i.e. includes its children's children.)
-    pub fn children_recursive<'a>(&self, document: &'a Document) -> Vec<&'a Node> {
+    pub fn children_recursive<'a>(&self, doc: &'a Document) -> Vec<&'a Node> {
         let mut nodes = Vec::new();
-        self._children_recursive(document, &mut nodes);
+        self._children_recursive(doc, &mut nodes);
         nodes
     }
 
-    /// `!self.children(document).is_empty()`
-    pub fn has_children(&self, document: &Document) -> bool {
-        !self.children(document).is_empty()
+    /// `!self.children(doc).is_empty()`
+    pub fn has_children(&self, doc: &Document) -> bool {
+        !self.children(doc).is_empty()
     }
 
     /// Get only child [`Element`]s of this element.
     ///
     /// This calls `.children().iter().filter_map().collect()`.
     /// Use [`Element::children()`] if performance is important.
-    pub fn child_elements(&self, document: &Document) -> Vec<Element> {
-        self.children(document)
+    pub fn child_elements(&self, doc: &Document) -> Vec<Element> {
+        self.children(doc)
             .iter()
             .filter_map(|node| {
                 if let Node::Element(elemid) = node {
@@ -439,8 +429,8 @@ impl Element {
     }
 
     /// Get child [`Element`]s recursively. (i.e. includes its child element's child elements)
-    pub fn child_elements_recursive(&self, document: &Document) -> Vec<Element> {
-        self.children_recursive(document)
+    pub fn child_elements_recursive(&self, doc: &Document) -> Vec<Element> {
+        self.children_recursive(doc)
             .iter()
             .filter_map(|node| {
                 if let Node::Element(elemid) = node {
@@ -453,21 +443,21 @@ impl Element {
     }
 
     /// Find first direct child element with name `name`.
-    pub fn find(&self, document: &Document, name: &str) -> Option<Element> {
-        self.children(document)
+    pub fn find(&self, doc: &Document, name: &str) -> Option<Element> {
+        self.children(doc)
             .iter()
             .filter_map(|n| n.as_element())
-            .filter(|e| e.name(document) == name)
+            .filter(|e| e.name(doc) == name)
             .next()
     }
 
     /// Find all direct child element with name `name`.
     /// If you care about performance, call `self.children().iter().filter()`
-    pub fn find_all(&self, document: &Document, name: &str) -> Vec<Element> {
-        self.children(document)
+    pub fn find_all(&self, doc: &Document, name: &str) -> Vec<Element> {
+        self.children(doc)
             .iter()
             .filter_map(|n| n.as_element())
-            .filter(|e| e.name(document) == name)
+            .filter(|e| e.name(doc) == name)
             .collect()
     }
 }
@@ -496,24 +486,24 @@ impl Element {
     /// - [`Error::HasAParent`]: If node is an element, it must not have a parent.
     /// Call `elem.detatch()` before.
     /// - [`Error::ContainerCannotMove`]: `node` cannot be container node.
-    pub fn push_child(&self, document: &mut Document, node: Node) -> Result<()> {
+    pub fn push_child(&self, doc: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {
                 return Err(Error::ContainerCannotMove);
             }
-            let data = elem.mut_data(document);
+            let data = elem.mut_data(doc);
             if data.parent.is_some() {
                 return Err(Error::HasAParent);
             }
             data.parent = Some(*self);
         }
-        self.mut_data(document).children.push(node);
+        self.mut_data(doc).children.push(node);
         Ok(())
     }
 
     /// Equivalent to `parent.push_child()`.
-    pub fn push_to(&self, document: &mut Document, parent: Element) -> Result<()> {
-        parent.push_child(document, self.as_node())
+    pub fn push_to(&self, doc: &mut Document, parent: Element) -> Result<()> {
+        parent.push_child(doc, self.as_node())
     }
 
     /// Equivalent to `vec.insert()`.
@@ -521,18 +511,18 @@ impl Element {
     /// # Panics
     ///
     /// Panics if `index > self.children().len()`
-    pub fn insert_child(&self, document: &mut Document, index: usize, node: Node) -> Result<()> {
+    pub fn insert_child(&self, doc: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {
                 return Err(Error::ContainerCannotMove);
             }
-            let data = elem.mut_data(document);
+            let data = elem.mut_data(doc);
             if data.parent.is_some() {
                 return Err(Error::HasAParent);
             }
             data.parent = Some(*self);
         }
-        self.mut_data(document).children.insert(index, node);
+        self.mut_data(doc).children.insert(index, node);
         Ok(())
     }
 
@@ -541,10 +531,10 @@ impl Element {
     /// # Panics
     ///
     /// Panics if `index >= self.children().len()`.
-    pub fn remove_child(&self, document: &mut Document, index: usize) -> Node {
-        let node = self.mut_data(document).children.remove(index);
+    pub fn remove_child(&self, doc: &mut Document, index: usize) -> Node {
+        let node = self.mut_data(doc).children.remove(index);
         if let Node::Element(elem) = node {
-            elem.mut_data(document).parent = None;
+            elem.mut_data(doc).parent = None;
         }
         node
     }
@@ -554,8 +544,8 @@ impl Element {
     /// # Errors
     ///
     /// - [Error::NotFound]: Element was not found among its children.
-    pub fn remove_child_elem(&self, document: &mut Document, element: Element) -> Result<()> {
-        let children = &mut self.mut_data(document).children;
+    pub fn remove_child_elem(&self, doc: &mut Document, element: Element) -> Result<()> {
+        let children = &mut self.mut_data(doc).children;
         let pos = children
             .iter()
             .filter_map(|n| {
@@ -568,25 +558,25 @@ impl Element {
             .position(|e| e == element)
             .ok_or(Error::NotFound)?;
         children.remove(pos);
-        element.mut_data(document).parent = None;
+        element.mut_data(doc).parent = None;
         Ok(())
     }
 
-    pub fn pop_child(&self, document: &mut Document) -> Option<Node> {
-        let child = self.mut_data(document).children.pop();
+    pub fn pop_child(&self, doc: &mut Document) -> Option<Node> {
+        let child = self.mut_data(doc).children.pop();
         if let Some(node) = &child {
             if let &Node::Element(elem) = node {
-                elem.mut_data(document).parent = None;
+                elem.mut_data(doc).parent = None;
             }
         }
         child
     }
 
     /// Remove all children
-    pub fn clear_children(&self, document: &mut Document) {
-        let children = &mut self.mut_data(document).children;
+    pub fn clear_children(&self, doc: &mut Document) {
+        let children = &mut self.mut_data(doc).children;
         for _ in 0..children.len() {
-            self.remove_child(document, 0);
+            self.remove_child(doc, 0);
         }
     }
 
@@ -595,13 +585,13 @@ impl Element {
     /// # Errors
     ///
     /// - [`Error::ContainerCannotMove`]: You can't detatch container element
-    pub fn detatch(&self, document: &mut Document) -> Result<()> {
+    pub fn detatch(&self, doc: &mut Document) -> Result<()> {
         if self.is_container() {
             return Err(Error::ContainerCannotMove);
         }
-        let parent = self.data(document).parent;
+        let parent = self.data(doc).parent;
         if let Some(parent) = parent {
-            parent.remove_child_elem(document, *self)
+            parent.remove_child_elem(doc, *self)
         } else {
             Ok(())
         }
