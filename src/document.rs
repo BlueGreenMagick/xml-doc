@@ -191,23 +191,47 @@ impl Document {
         DocumentParser::parse_reader(reader, opts)
     }
 }
+
+pub struct WriteOptions {
+    pub indent_char: u8,
+    pub indent_size: usize,
+}
+
+impl WriteOptions {
+    pub fn default() -> WriteOptions {
+        WriteOptions {
+            indent_char: b' ',
+            indent_size: 2,
+        }
+    }
+}
+
 /// Below are methods for writing xml.
 /// The XML will be written in UTF-8.
 impl Document {
     pub fn write_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        self.write_file_with_opts(path, WriteOptions::default())
+    }
+    pub fn write_file_with_opts<P: AsRef<Path>>(&self, path: P, opts: WriteOptions) -> Result<()> {
         let mut file = File::open(path)?;
-        self.write(&mut file)
+        self.write_with_opts(&mut file, opts)
     }
 
     pub fn write_str(&self) -> Result<String> {
+        self.write_str_with_opts(WriteOptions::default())
+    }
+    pub fn write_str_with_opts(&self, opts: WriteOptions) -> Result<String> {
         let mut buf: Vec<u8> = Vec::with_capacity(200);
-        self.write(&mut buf)?;
+        self.write_with_opts(&mut buf, opts)?;
         Ok(String::from_utf8(buf)?)
     }
 
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
+        self.write_with_opts(writer, WriteOptions::default())
+    }
+    pub fn write_with_opts(&self, writer: &mut impl Write, opts: WriteOptions) -> Result<()> {
         let container = self.container();
-        let mut writer = Writer::new_with_indent(writer, b' ', 4);
+        let mut writer = Writer::new_with_indent(writer, opts.indent_char, opts.indent_size);
         self.write_decl(&mut writer)?;
         self.write_nodes(&mut writer, container.children(self))?;
         writer.write_event(Event::Eof)?;
