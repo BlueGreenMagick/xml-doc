@@ -205,28 +205,29 @@ impl DocumentParser {
     }
 
     fn create_element(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
-        let mut_doc = &mut self.doc;
         let full_name = String::from_utf8(ev.name().to_vec())?;
-        let element = Element::new(mut_doc, full_name);
-        let mut namespaces = HashMap::new();
-        let attributes = element.mut_attributes(mut_doc);
+        let mut namespace_decls = HashMap::new();
+        let mut attributes = HashMap::new();
         for attr in ev.attributes() {
             let mut attr = attr?;
             attr.value = Cow::Owned(normalize_space(&attr.value));
             let key = String::from_utf8(attr.key.to_vec())?;
             let value = String::from_utf8(attr.unescaped_value()?.to_vec())?;
             if key == "xmlns" {
-                namespaces.insert(String::new(), value);
+                namespace_decls.insert(String::new(), value);
                 continue;
             } else if let Some(prefix) = key.strip_prefix("xmlns:") {
-                namespaces.insert(prefix.to_owned(), value);
+                namespace_decls.insert(prefix.to_owned(), value);
                 continue;
             }
             attributes.insert(key, value);
         }
-        element.mut_namespace_decls(mut_doc).extend(namespaces);
-        parent.push_child(mut_doc, Node::Element(element)).unwrap();
-        Ok(element)
+
+        let elem = Element::with_data(&mut self.doc, full_name, attributes, namespace_decls);
+        parent
+            .push_child(&mut self.doc, Node::Element(elem))
+            .unwrap();
+        Ok(elem)
     }
 
     // Returns true if document parsing is finished.
