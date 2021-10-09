@@ -69,4 +69,4 @@ mod parser;
 pub use crate::document::{Document, Node};
 pub use crate::element::{Element, ElementBuilder};
 pub use crate::error::{Error, Result};
-pub use crate::parser::ReadOptions;
+pub use crate::parser::{normalize_space, ReadOptions};

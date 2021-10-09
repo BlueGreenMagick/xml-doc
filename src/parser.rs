@@ -3,7 +3,6 @@ use crate::element::Element;
 use crate::error::{Error, Result};
 use encoding_rs::Decoder;
 use encoding_rs::{Encoding, UTF_16BE, UTF_16LE, UTF_8};
-use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
 use std::borrow::Cow;
@@ -201,36 +200,6 @@ impl DocumentParser {
         Ok(())
     }
 
-    // #x20( ), #xD(\r), #xA(\n), #x9(\t) should be normalized into #x20 unless it's a character reference (&#xx).
-    // Entity referenced above characters should be normalized into #x20.
-    // If attribute type is not CDATA, leading and trailing spaces(#x20) should be discarded
-    // and sequence of space shoule be replaced by a single space
-    fn normalize_attr_value(attr: &mut Attribute) {
-        let mut normalized = Vec::with_capacity(attr.value.len());
-        let mut char_found = false;
-        let mut last_space = false;
-        for i in 0..attr.value.len() {
-            match attr.value[i] {
-                b'\r' | b'\n' | b'\t' | b' ' => {
-                    if char_found && !last_space {
-                        normalized.push(b' ');
-                        last_space = true;
-                    }
-                }
-                val => {
-                    char_found = true;
-                    last_space = false;
-                    normalized.push(val);
-                }
-            }
-        }
-        // There can't be multiple whitespaces
-        if normalized.last() == Some(&b' ') {
-            normalized.pop();
-        }
-        attr.value = Cow::Owned(normalized);
-    }
-
     fn create_element(&mut self, parent: Element, ev: &BytesStart) -> Result<Element> {
         let mut_doc = &mut self.document;
         let full_name = String::from_utf8(ev.name().to_vec())?;
@@ -239,7 +208,7 @@ impl DocumentParser {
         let attributes = element.mut_attributes(mut_doc);
         for attr in ev.attributes() {
             let mut attr = attr?;
-            Self::normalize_attr_value(&mut attr);
+            attr.value = Cow::Owned(normalize_space(&attr.value));
             let key = String::from_utf8(attr.key.to_vec())?;
             let value = String::from_utf8(attr.unescaped_value()?.to_vec())?;
             if key == "xmlns" {
@@ -400,4 +369,33 @@ impl DocumentParser {
             }
         }
     }
+}
+
+/// #xD(\r), #xA(\n), #x9(\t) is normalized into #x20.
+/// Leading and trailing spaces(#x20) are discarded
+/// and sequence of spaces are replaced by a single space.
+pub fn normalize_space(bytes: &[u8]) -> Vec<u8> {
+    let mut normalized = Vec::with_capacity(bytes.len());
+    let mut char_found = false;
+    let mut last_space = false;
+    for i in 0..bytes.len() {
+        match bytes[i] {
+            b'\r' | b'\n' | b'\t' | b' ' => {
+                if char_found && !last_space {
+                    normalized.push(b' ');
+                    last_space = true;
+                }
+            }
+            val => {
+                char_found = true;
+                last_space = false;
+                normalized.push(val);
+            }
+        }
+    }
+    // There can't be multiple whitespaces
+    if normalized.last() == Some(&b' ') {
+        normalized.pop();
+    }
+    normalized
 }
