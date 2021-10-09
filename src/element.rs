@@ -223,7 +223,7 @@ impl Element {
         self.mut_data(doc).full_name = name.into();
     }
 
-    /// Get prefix and name of element.
+    /// Get prefix and name of element. If it doesn't have prefix, will return an empty string.
     ///
     /// `<prefix: name` -> `("prefix", "name")`
     pub fn prefix_name<'a>(&self, doc: &'a Document) -> (&'a str, &'a str) {
@@ -246,7 +246,12 @@ impl Element {
     pub fn set_prefix<S: Into<String>>(&self, doc: &mut Document, prefix: S) {
         let data = self.mut_data(doc);
         let (_, name) = Self::separate_prefix_name(&data.full_name);
-        data.full_name = format!("{}:{}", prefix.into(), name);
+        let prefix: String = prefix.into();
+        if prefix.is_empty() {
+            data.full_name = name.to_string();
+        } else {
+            data.full_name = format!("{}:{}", prefix, name);
+        }
     }
 
     /// Get name of element, without its namespace prefix.
