@@ -192,9 +192,17 @@ impl Document {
     }
 }
 
+/// Options when writing XML.
+///
+/// indent_char: b' ' - byte character to indent with
+///
+/// indent_size: 2 - how many indent_char should be used for indent
+///
+/// write_decl: true - XML declaration should be written at the top
 pub struct WriteOptions {
     pub indent_char: u8,
     pub indent_size: usize,
+    pub write_decl: bool,
 }
 
 impl WriteOptions {
@@ -202,6 +210,7 @@ impl WriteOptions {
         WriteOptions {
             indent_char: b' ',
             indent_size: 2,
+            write_decl: true,
         }
     }
 }
@@ -232,7 +241,9 @@ impl Document {
     pub fn write_with_opts(&self, writer: &mut impl Write, opts: WriteOptions) -> Result<()> {
         let container = self.container();
         let mut writer = Writer::new_with_indent(writer, opts.indent_char, opts.indent_size);
-        self.write_decl(&mut writer)?;
+        if opts.write_decl {
+            self.write_decl(&mut writer)?;
+        }
         self.write_nodes(&mut writer, container.children(self))?;
         writer.write_event(Event::Eof)?;
         Ok(())
