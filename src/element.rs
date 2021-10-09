@@ -294,7 +294,7 @@ impl Element {
     /// Add or set attribute.
     ///
     /// If `name` contains a `:`,
-    /// or everything before `:` will be interpreted as namespace prefix.
+    /// everything before `:` will be interpreted as namespace prefix.
     pub fn set_attribute<S, T>(&self, doc: &mut Document, name: S, value: T)
     where
         S: Into<String>,
@@ -337,10 +337,14 @@ impl Element {
             .insert(prefix.into(), namespace.into());
     }
 
-    // TODO: check out https://www.w3.org/TR/xml-names/#ns-decl
-    // about xmlns and xml prefix
     /// Get namespace value given prefix, for this element.
+    /// "xml" and "xmlns" returns its default namespace.
     pub fn namespace_for_prefix<'a>(&self, doc: &'a Document, prefix: &str) -> Option<&'a str> {
+        match prefix {
+            "xml" => return Some("http://www.w3.org/XML/1998/namespace"),
+            "xmlns" => return Some("http://www.w3.org/2000/xmlns/"),
+            _ => (),
+        };
         let mut elem = *self;
         loop {
             let data = elem.data(doc);
