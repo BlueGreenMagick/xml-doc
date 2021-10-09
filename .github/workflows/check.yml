@@ -21,8 +21,3 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose
-
-      - name: Benchmark
-        run: |
-          cd benches
-          cargo bench xmldoc
