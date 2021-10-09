@@ -9,7 +9,7 @@ Features:
 - Supports reading from most encodings, including UTF-16. (With the notable exception of UTF-32)
 - You can have references to the parts of the tree, and still mutate the tree.
 - Elements stores reference to its parent element, so traveling up the tree is fast.
-- One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/xml-doc#performance).
+- One of the fastest XML tree-like parser & writer. See [#Performance](https://github.com/bluegreenmagick/xml-doc#performance).
 - Supports attribute value normalization, character/entity references.
 
 Due to its architecture, you can't exchange nodes or elements between documents.
@@ -51,11 +51,11 @@ To run benchmark: `cd benches ; cargo bench`.
 ### Parsing
 
 ```
-          tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16, 3.0MB)
-xml_doc:   67.017us    28.347ms     339.31ms         29.729ms
-minidom:    96.403us    43.271ms     630.24ms
-roxmltree:  49.020us    16.304ms     332.86ms
-xmltree:  3964.2us    1228.5ms     21128.0ms
+                  tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16)
+xml_doc v0.1.0:     88.27us     35.11ms      370.35ms        36.29ms
+minidom v0.12.0:    86.41us     47.64ms      612.22ms
+roxmltree v0.14.1:  53.96us     18.62ms      353.33ms
+xmltree v0.10.3:  4292.9 us   1329.4 ms    22442. ms
 ```
 
-You can see the result of benchmarks [here](https://github.com/BlueGreenMagick/xml-doc/actions/runs/1291967402).
+Only roxmltree which doesn't support writing, is considerably faster than xml_doc. You can see the result of the benchmarks [here](https://github.com/BlueGreenMagick/xml-doc/actions/runs/1322736020).
