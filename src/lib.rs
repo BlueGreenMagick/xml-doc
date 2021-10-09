@@ -9,7 +9,7 @@
 //!
 //! # Example
 //! ```
-//! use easy_xml::{Document, Element, Node};
+//! use xml_doc::{Document, Element, Node};
 //!
 //! const data: &'static str = r#"<?xml version="1.0" encoding="utf-8"?>
 //! <metadata>     
@@ -37,7 +37,7 @@
 //! Below example goes through the root element's children and removes all nodes that isn't `<conf>...</conf>`
 //! ```no_run
 //! use std::path::Path;
-//! use easy_xml::{Document, Node};
+//! use xml_doc::{Document, Node};
 //!
 //! let xml_file = Path::new("config.xml");
 //! let mut doc = Document::parse_file(&xml_file).unwrap();
@@ -66,7 +66,7 @@ mod element;
 mod error;
 mod parser;
 
-pub use crate::document::{Document, Node};
+pub use crate::document::{Document, Node, WriteOptions};
 pub use crate::element::{Element, ElementBuilder};
 pub use crate::error::{Error, Result};
 pub use crate::parser::{normalize_space, ReadOptions};

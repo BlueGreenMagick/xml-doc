@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-easy-xml = {path = "../"}
+xml-doc = {path = "../"}
 minidom = "0.12"
 roxmltree = "0.14"
 xmltree = "0.10"

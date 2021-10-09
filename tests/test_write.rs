@@ -1,4 +1,4 @@
-use easy_xml::{Document, Element};
+use xml_doc::{Document, Element};
 
 #[test]
 fn test_escape() {

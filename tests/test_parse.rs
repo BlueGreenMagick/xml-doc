@@ -1,8 +1,8 @@
-use easy_xml::Document;
+use xml_doc::Document;
 
 #[test]
 fn test_normalize_attr() {
-    // See comment on easy_xml::parser::DocumentParser::normalize_attr_value
+    // See comment on xml_doc::parser::DocumentParser::normalize_attr_value
     let xml = "<?xml version=\"1.0\"?>
 <root attr=\" \r\t
 

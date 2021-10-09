@@ -1,10 +1,10 @@
 [package]
-name = "easy-xml"
+name = "xml-doc"
 version = "0.1.0"
 authors = ["Yoonchae Lee <bluegreenmagick@gmail.com>"]
 description = "Read, modify and write xml in tree-like structure. Supports UTF-16."
 edition = "2018"
-repository = "https://github.com/bluegreenmagick/easy-xml"
+repository = "https://github.com/bluegreenmagick/xml-doc"
 license = "MIT OR Apache-2.0"
 keywords = ["xml", "parser", "reader", "writer"]
 categories = ["parser-implementations", "data-structures", "encoding"]

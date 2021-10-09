@@ -1,6 +1,6 @@
-# easy-xml
+# xml-doc
 
-easy-xml is a rust library to read, modify, and write XML documents.
+xml-doc is a rust library to read, modify, and write XML documents.
 
 It's aim is to be able to read **any** xml files, and modify only the parts you want to.
 
@@ -9,7 +9,7 @@ Features:
 - Supports reading from most encodings, including UTF-16. (With the notable exception of UTF-32)
 - You can have references to the parts of the tree, and still mutate the tree.
 - Elements stores reference to its parent element, so traveling up the tree is fast.
-- One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/easy-xml#performance).
+- One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/xml-doc#performance).
 - Supports attribute value normalization, character/entity references.
 
 Due to its architecture, you can't exchange nodes or elements between documents.
@@ -18,12 +18,12 @@ If your project modifies multiple xml documents at the same time, this library m
 ## Example
 
 ```rust
-use easy_xml::{Document, Element};
+use xml_doc::{Document, Element};
 
 let XML = r#"<?xml version="1.0"?>
 <package xmlns:dc="http://purl.org/dc/elements/1.1/">
     <metadata>
-        <dc:title>easy-xml</dc:title>
+        <dc:title>xml-doc</dc:title>
         <dc:rights>MIT or Apache 2.0</dc:rights>
     </metadata>
 </package>
@@ -52,10 +52,10 @@ To run benchmark: `cd benches ; cargo bench`.
 
 ```
           tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16, 3.0MB)
-easy_xml:   67.017us    28.347ms     339.31ms         29.729ms
+xml_doc:   67.017us    28.347ms     339.31ms         29.729ms
 minidom:    96.403us    43.271ms     630.24ms
 roxmltree:  49.020us    16.304ms     332.86ms
 xmltree:  3964.2us    1228.5ms     21128.0ms
 ```
 
-You can see the result of benchmarks [here](https://github.com/BlueGreenMagick/easy-xml/actions/runs/1291967402).
+You can see the result of benchmarks [here](https://github.com/BlueGreenMagick/xml-doc/actions/runs/1291967402).

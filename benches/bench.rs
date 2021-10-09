@@ -11,13 +11,13 @@ macro_rules! bench {
     };
 }
 
-fn easyxml_parse(path: &Path) {
-    easy_xml::Document::parse_file(path).unwrap();
+fn xmldoc_parse(path: &Path) {
+    xml_doc::Document::parse_file(path).unwrap();
 }
-bench!("tiny.xml", tiny_easyxml, easyxml_parse);
-bench!("medium.xml", medium_easyxml, easyxml_parse);
-bench!("large.xml", large_easyxml, easyxml_parse);
-bench!("medium_utf16.xml", utf16_easyxml, easyxml_parse);
+bench!("tiny.xml", tiny_xmldoc, xmldoc_parse);
+bench!("medium.xml", medium_xmldoc, xmldoc_parse);
+bench!("large.xml", large_xmldoc, xmldoc_parse);
+bench!("medium_utf16.xml", utf16_xmldoc, xmldoc_parse);
 
 fn minidom_parse(path: &Path) {
     let mut reader = minidom::quick_xml::Reader::from_file(path).unwrap();
@@ -47,12 +47,12 @@ bench!("large.xml", large_xmltree, xmltree_parse);
 criterion_group! {
     name = tiny;
     config = Criterion::default().sample_size(200);
-    targets = tiny_easyxml, tiny_minidom, tiny_roxmltree, tiny_xmltree
+    targets = tiny_xmldoc, tiny_minidom, tiny_roxmltree, tiny_xmltree
 }
 
 criterion_group!(
     medium,
-    medium_easyxml,
+    medium_xmldoc,
     medium_minidom,
     medium_roxmltree,
     medium_xmltree,
@@ -61,17 +61,17 @@ criterion_group!(
 criterion_group! {
     name = large;
     config = Criterion::default().sample_size(50);
-    targets = large_easyxml, large_minidom, large_roxmltree, large_xmltree
+    targets = large_xmldoc, large_minidom, large_roxmltree, large_xmltree
 }
 
-criterion_group!(utf_16, utf16_easyxml);
+criterion_group!(utf_16, utf16_xmldoc);
 
 criterion_group!(
-    easyxml,
-    tiny_easyxml,
-    medium_easyxml,
-    large_easyxml,
-    utf16_easyxml
+    xmldoc,
+    tiny_xmldoc,
+    medium_xmldoc,
+    large_xmldoc,
+    utf16_xmldoc
 );
 criterion_group!(roxmltree, tiny_roxmltree, medium_roxmltree, large_roxmltree);
 criterion_group!(xmltree, tiny_xmltree, medium_xmltree, large_xmltree);

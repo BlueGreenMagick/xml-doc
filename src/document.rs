@@ -23,7 +23,7 @@ impl Node {
     /// Useful to use inside `filter_map`.
     ///
     /// ```
-    /// use easy_xml::{Document, Element};
+    /// use xml_doc::{Document, Element};
     ///
     /// let mut doc = Document::parse_str(r#"<?xml version="1.0" encoding="UTF-8"?>
     /// <config>
@@ -72,7 +72,7 @@ impl Node {
 ///
 /// # Examples
 /// ```
-/// use easy_xml::Document;
+/// use xml_doc::Document;
 ///
 /// let mut doc = Document::parse_str(r#"<?xml version="1.0" encoding="UTF-8"?>
 /// <package>

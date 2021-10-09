@@ -1,10 +1,10 @@
-use easy_xml::{Document, Element, Node, ReadOptions};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
+use xml_doc::{Document, Element, Node, ReadOptions};
 
 #[derive(Clone)]
 struct TStr(pub String);
