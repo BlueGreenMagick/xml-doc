@@ -124,6 +124,8 @@ impl<R: Read> BufRead for DecodeReader<R> {
 ///
 /// `empty_text_node`: true - <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
 ///
+/// `trim_text`: true - trims leading and ending whitespaces in Node::Text.
+///
 /// `require_decl`: true - Returns error if document doesn't start with XML declaration.
 /// If this is set to false, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
 ///
@@ -133,6 +135,7 @@ impl<R: Read> BufRead for DecodeReader<R> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
     pub empty_text_node: bool,
+    pub trim_text: bool,
     pub require_decl: bool,
     pub encoding: Option<String>,
 }
@@ -141,6 +144,7 @@ impl ReadOptions {
     pub fn default() -> ReadOptions {
         ReadOptions {
             empty_text_node: true,
+            trim_text: true,
             require_decl: true,
             encoding: None,
         }
@@ -289,7 +293,9 @@ impl DocumentParser {
                 parent.push_child(&mut self.document, node).unwrap();
                 Ok(false)
             }
-            Event::Decl(_) => Ok(false),
+            Event::Decl(_) => Err(Error::MalformedXML(
+                "XML declaration found in the middle of the document".to_string(),
+            )),
             Event::Eof => Ok(true),
         }
     }
@@ -333,7 +339,7 @@ impl DocumentParser {
         }
         decodereader.set_encoding(init_encoding);
         let mut xmlreader = Reader::from_reader(decodereader);
-        xmlreader.trim_text(true);
+        xmlreader.trim_text(self.read_opts.trim_text);
 
         let mut buf = Vec::with_capacity(200);
         let event = xmlreader.read_event(&mut buf)?;
@@ -346,7 +352,7 @@ impl DocumentParser {
                 let mut decode_reader = xmlreader.into_underlying_reader();
                 decode_reader.set_encoding(self.encoding);
                 xmlreader = Reader::from_reader(decode_reader);
-                xmlreader.trim_text(true);
+                xmlreader.trim_text(self.read_opts.trim_text);
             }
         } else if self.read_opts.require_decl {
             return Err(Error::MalformedXML(

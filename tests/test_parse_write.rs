@@ -133,6 +133,7 @@ where
     for k in opts.iter().multi_cartesian_product() {
         let read_options = ReadOptions {
             empty_text_node: *k[0],
+            trim_text: true,
             require_decl: true,
             encoding: None,
         };

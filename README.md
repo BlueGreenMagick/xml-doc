@@ -5,12 +5,14 @@ easy-xml is a rust library to read, modify, and write XML documents.
 It's aim is to be able to read **any** xml files, and modify only the parts you want to.
 
 Features:
+
 - Supports reading from most encodings, including UTF-16. (With the notable exception of UTF-32)
 - You can have references to the parts of the tree, and still mutate the tree.
 - Elements stores reference to its parent element, so traveling up the tree is fast.
 - One of the fastest XML tree-like parser. See [#Performance](https://github.com/bluegreenmagick/easy-xml#performance).
+- Supports attribute value normalization, character/entity references.
 
-Due to its architecture, you can't exchange nodes or elements between documents. 
+Due to its architecture, you can't exchange nodes or elements between documents.
 If your project modifies multiple xml documents at the same time, this library may not be a good fit.
 
 ## Example
@@ -44,9 +46,10 @@ let new_xml = doc.write_str();
 
 ## Performance
 
-To run benchmark: `cd benches ; cargo bench`. 
+To run benchmark: `cd benches ; cargo bench`.
 
 ### Parsing
+
 ```
           tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16, 3.0MB)
 easy_xml:   67.017us    28.347ms     339.31ms         29.729ms
