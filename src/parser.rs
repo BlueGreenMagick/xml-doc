@@ -19,11 +19,11 @@ macro_rules! debug {
 pub(crate) struct DecodeReader<R: Read> {
     decoder: Option<Decoder>,
     inner: R,
-    undecoded: [u8; 4096],
+    undecoded: Box<[u8]>,
     undecoded_pos: usize,
     undecoded_cap: usize,
     remaining: [u8; 32], // Is there an encoding with > 32 bytes for a char?
-    decoded: [u8; 12288],
+    decoded: Box<[u8]>,
     decoded_pos: usize,
     decoded_cap: usize,
     done: bool,
@@ -35,11 +35,11 @@ impl<R: Read> DecodeReader<R> {
         DecodeReader {
             decoder,
             inner: reader,
-            undecoded: [0; 4096],
+            undecoded: vec![0; 4096].into_boxed_slice(),
             undecoded_pos: 0,
             undecoded_cap: 0,
             remaining: [0; 32],
-            decoded: [0; 12288],
+            decoded: vec![0; 12288].into_boxed_slice(),
             decoded_pos: 0,
             decoded_cap: 0,
             done: false,
