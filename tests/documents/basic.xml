@@ -1,6 +1,0 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<root attr="value" attr2="hey">
-    <self-closing/>
-    Text:
-    <b>Hello World!</b>
-</root>

@@ -1,0 +1,36 @@
+Root:
+  - Element:
+      name: root
+      attributes:
+        attr: "value"
+        attr2: "hey"
+      children:
+        - Element:
+            name: self-closing
+        - Text: "\n  Text\n  "
+        - Element:
+            name: b
+            children:
+              - Text: "Hello World!"
+        - Element:
+            name: items
+            attributes:
+              id: "items"
+            namespaces:
+              : "def ns"
+              ns: "a namespace"
+            children:
+              - Element:
+                  name: ns:item
+                  children:
+                    - Text: "한국어"
+              - Element:
+                  name: ns:item
+                  attributes:
+                    ns:attr: "val"
+                  children:
+                    - Text: "日本語"
+              - Element:
+                  name: item
+                  children:
+                    - Text: ""

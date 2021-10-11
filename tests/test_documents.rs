@@ -35,11 +35,46 @@ fn render_nodes(doc: &Document, nodes: &Vec<Node>, depth: usize, buf: &mut Strin
     for node in nodes {
         match node {
             Node::Element(id) => render_element(doc, *id, depth, buf),
-            Node::Text(text) => write_line(&format!("- Text: \"{}\"", text), depth, buf),
-            Node::Comment(text) => write_line(&format!("- Comment: \"{}\"", text), depth, buf),
-            Node::CData(text) => write_line(&format!("- CData: \"{}\"", text), depth, buf),
-            Node::DocType(text) => write_line(&format!("- DocType: \"{}\"", text), depth, buf),
-            Node::PI(text) => write_line(&format!("- PI: \"{}\"", text), depth, buf),
+            Node::Text(text) => write_line(
+                &format!(
+                    "- Text: \"{}\"",
+                    text.replace("\n", r"\n").replace("\r", r"\r")
+                ),
+                depth,
+                buf,
+            ),
+            Node::Comment(text) => write_line(
+                &format!(
+                    "- Comment: \"{}\"",
+                    text.replace("\n", r"\n").replace("\r", r"\r")
+                ),
+                depth,
+                buf,
+            ),
+            Node::CData(text) => write_line(
+                &format!(
+                    "- CData: \"{}\"",
+                    text.replace("\n", r"\n").replace("\r", r"\r")
+                ),
+                depth,
+                buf,
+            ),
+            Node::DocType(text) => write_line(
+                &format!(
+                    "- DocType: \"{}\"",
+                    text.replace("\n", r"\n").replace("\r", r"\r")
+                ),
+                depth,
+                buf,
+            ),
+            Node::PI(text) => write_line(
+                &format!(
+                    "- PI: \"{}\"",
+                    text.replace("\n", r"\n").replace("\r", r"\r")
+                ),
+                depth,
+                buf,
+            ),
         }
     }
 }
@@ -102,8 +137,9 @@ fn get_expected(file_name: &str) -> TStr {
     )
 }
 
-// Documents and xml files are supposed to have a 1:1 relationship.
-// Then write is ok if read function is ok, and read(write(D)) == D
+// When read_opts and write_opts are both default,
+// read(write(doc)) should be doc.
+// just a basic test for writing.
 fn test_write(doc: &Document) -> TStr {
     let expected = TStr(to_yaml(&doc));
     let written_xml = doc.write_str().unwrap();
@@ -128,16 +164,27 @@ where
 
     // Options
     let empty_text_node_opts = [true, false];
-    let opts = [empty_text_node_opts];
+    let trim_text = [true, false];
+    let ignore_whitespace_only = [true, false];
+    let require_decl = [true, false];
+    let opts = [
+        empty_text_node_opts,
+        trim_text,
+        ignore_whitespace_only,
+        require_decl,
+    ];
 
     for k in opts.iter().multi_cartesian_product() {
         let mut read_options = ReadOptions::default();
         read_options.empty_text_node = *k[0];
+        read_options.trim_text = *k[1];
+        read_options.ignore_whitespace_only = *k[2];
+        read_options.require_decl = *k[3];
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);
 
         let result = match Document::parse_file_with_opts(&xml_file, read_options.clone()) {
-            Ok(doc) => test_write(&doc),
+            Ok(doc) => TStr(to_yaml(&doc)),
             Err(error) => {
                 println!("{:?}", error);
                 let debug_str = format!("{:?}", error);
@@ -154,38 +201,52 @@ where
             result,
         );
     }
-}
-#[test]
-fn basic() {
-    test("basic.xml", |_| "basic.yaml".to_string())
-}
-
-#[test]
-fn emptytag() {
-    test("emptytag.xml", |opts| {
-        if opts.empty_text_node == true {
-            "emptytag_emptytext.yaml"
-        } else {
-            "emptytag.yaml"
-        }
-    })
-}
-
-#[test]
-fn encoding1() {
-    test("encoding1.xml", |_| "encoding1.yaml".to_string())
-}
-
-#[test]
-fn encoding2() {
-    test("encoding2.xml", |_| "encoding2.yaml".to_string())
+    // Test write
+    let doc = Document::parse_file(&xml_file).unwrap();
+    test_write(&doc);
 }
 
 #[test]
 fn nodes() {
-    test("nodes.xml", |_| "nodes.yaml".to_string())
+    test("nodes.xml", |opts| {
+        if !opts.ignore_whitespace_only && !opts.trim_text {
+            "nodes_noignws.yaml"
+        } else if !opts.trim_text {
+            "nodes_notrim.yaml"
+        } else {
+            "nodes_.yaml"
+        }
+    })
+}
+
+fn expected_doc_yaml<'a>(opts: &ReadOptions) -> &'a str {
+    if opts.empty_text_node {
+        if opts.trim_text {
+            "doc_etn_trim.yaml"
+        } else if opts.ignore_whitespace_only {
+            "doc_etn_ignws.yaml"
+        } else {
+            "doc_etn.yaml"
+        }
+    } else if opts.trim_text {
+        "doc_trim.yaml"
+    } else if opts.ignore_whitespace_only {
+        "doc_ignws.yaml"
+    } else {
+        "doc_.yaml"
+    }
 }
 #[test]
-fn namespace() {
-    test("namespace.xml", |_| "namespace.yaml".to_string())
+fn document() {
+    test("doc.xml", expected_doc_yaml)
+}
+
+#[test]
+fn encoding1() {
+    test("encoding1.xml", expected_doc_yaml)
+}
+
+#[test]
+fn encoding2() {
+    test("encoding2.xml", expected_doc_yaml)
 }

@@ -1,0 +1,8 @@
+Root:
+  - Element:
+      name: el
+  - Text: "\nText\n"
+  - Comment: " Comment "
+  - DocType: "doctype"
+  - CData: "<tag>text</tag>"
+  - PI: "xml-stylesheet type="text/xsl""

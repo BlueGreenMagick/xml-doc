@@ -1,7 +1,0 @@
-Root:
-  - Element:
-      name: abc
-      attributes:
-        attr: "アツル"
-      children:
-        - Text: "Hello 세상!"

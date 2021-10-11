@@ -276,6 +276,10 @@ impl DocumentParser {
                 if self.read_opts.ignore_whitespace_only && only_has_whitespace(&ev) {
                     return Ok(false);
                 }
+                // when trim_text, ignore_whitespace_only, empty_text_node are all false
+                if ev.is_empty() {
+                    return Ok(false);
+                }
                 let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Text(content);
                 let parent = *self

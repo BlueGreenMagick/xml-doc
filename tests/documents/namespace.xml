@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<root attr1="val1" xmlns="http://example.xml" attr2="val2">
-    <tag2 xmlns="tag2 namespace" xmlns:p="p namespace">
-        <p:a/>
-    </tag2>
-    Text
-</root>

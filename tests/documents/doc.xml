@@ -1,11 +1,11 @@
-<?xml version='1.0' encoding='EUC-KR'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <root attr="value" attr2="hey">
   <self-closing/>
   Text
   <b>Hello World!</b>
   <items  xmlns="def ns" id="items" xmlns:ns="a namespace">
-    <ns:item >ΗΡ±ΉΎξ</ns:item>
-    <ns:item ns:attr="val">μνάβεή</ns:item>
+    <ns:item >ν•κµ­μ–΄</ns:item>
+    <ns:item ns:attr="val">ζ—¥ζ¬θª</ns:item>
     <item></item>
   </items>
 </root>
