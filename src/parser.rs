@@ -121,26 +121,27 @@ impl<R: Read> BufRead for DecodeReader<R> {
 }
 
 /// Options when parsing xml.
-///
-/// `empty_text_node`: true - <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
-///
-/// `trim_text`: true - trims leading and ending whitespaces in Node::Text.
-///
-/// `require_decl`: true - Returns error if document doesn't start with XML declaration.
-/// If this is set to false, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
-///
-/// `encoding`: None - If this is set, the parser will start reading with this encoding.
-/// But it will switch to XML declaration's encoding value if it has a different value.
-/// See [`encoding_rs::Encoding::for_label`] for valid values.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadOptions {
+    /// <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
+    /// Default: `true`
     pub empty_text_node: bool,
+    /// Trims leading and ending whitespaces in Node::Text.
+    /// Default: `true`
     pub trim_text: bool,
+    /// Returns error if document doesn't start with XML declaration.
+    /// If this is set to false, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
+    /// Default: `true`
     pub require_decl: bool,
+    /// If this is set, the parser will start reading with this encoding.
+    /// But it will switch to XML declaration's encoding value if it has a different value.
+    /// See [`encoding_rs::Encoding::for_label`] for valid values.
+    /// Default: `None`
     pub encoding: Option<String>,
 }
 
 impl ReadOptions {
+    /// Create ReadOptions with default options.
     pub fn default() -> ReadOptions {
         ReadOptions {
             empty_text_node: true,

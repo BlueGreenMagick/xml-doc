@@ -11,11 +11,17 @@ use std::str::FromStr;
 /// Represents an XML node.
 #[derive(Debug)]
 pub enum Node {
+    /// XML Element
     Element(Element),
+    /// XML Character Data ([specification](https://www.w3.org/TR/xml/#syntax))
     Text(String),
+    /// Comments ([specification](https://www.w3.org/TR/xml/#sec-comments))
     Comment(String),
+    /// CDATA ([specification](https://www.w3.org/TR/xml/#sec-cdata-sect))
     CData(String),
+    /// Processing Instruction ([specification](https://www.w3.org/TR/xml/#sec-pi))
     PI(String),
+    /// Document Type Declaration ([specification](https://www.w3.org/TR/xml/#sec-prolog-dtd))
     DocType(String),
 }
 
