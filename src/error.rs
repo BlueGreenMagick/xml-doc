@@ -19,8 +19,6 @@ pub enum Error {
     /// Use `element.is_container()` to check if it is a container before
     /// assigning it to another parent.
     ContainerCannotMove,
-    /// Could not find the element to remove among its children.
-    NotFound,
     /// You need to call `element.detatch()` before assigning another parent.
     HasAParent,
 }
