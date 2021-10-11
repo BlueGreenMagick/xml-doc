@@ -385,7 +385,7 @@ impl Element {
     pub fn set_text_content<S: Into<String>>(&self, doc: &mut Document, text: S) {
         self.clear_children(doc);
         let node = Node::Text(text.into());
-        self.mut_data(doc).children.push(node);
+        self.push_child(doc, node).unwrap();
     }
 }
 
@@ -546,29 +546,6 @@ impl Element {
         node
     }
 
-    /// Remove child element by value.
-    ///
-    /// # Errors
-    ///
-    /// - [Error::NotFound]: Element was not found among its children.
-    pub fn remove_child_elem(&self, doc: &mut Document, element: Element) -> Result<()> {
-        let children = &mut self.mut_data(doc).children;
-        let pos = children
-            .iter()
-            .filter_map(|n| {
-                if let Node::Element(elem) = &n {
-                    Some(*elem)
-                } else {
-                    None
-                }
-            })
-            .position(|e| e == element)
-            .ok_or(Error::NotFound)?;
-        children.remove(pos);
-        element.mut_data(doc).parent = None;
-        Ok(())
-    }
-
     pub fn pop_child(&self, doc: &mut Document) -> Option<Node> {
         let child = self.mut_data(doc).children.pop();
         if let Some(Node::Element(elem)) = &child {
@@ -579,8 +556,7 @@ impl Element {
 
     /// Remove all children
     pub fn clear_children(&self, doc: &mut Document) {
-        let children = &mut self.mut_data(doc).children;
-        for _ in 0..children.len() {
+        for _ in 0..self.children(doc).len() {
             self.remove_child(doc, 0);
         }
     }
@@ -594,12 +570,16 @@ impl Element {
         if self.is_container() {
             return Err(Error::ContainerCannotMove);
         }
-        let parent = self.data(doc).parent;
-        if let Some(parent) = parent {
-            parent.remove_child_elem(doc, *self)
-        } else {
-            Ok(())
+        let data = self.mut_data(doc);
+        if let Some(parent) = data.parent {
+            let pos = parent
+                .children(doc)
+                .iter()
+                .position(|n| n.as_element() == Some(*self))
+                .unwrap();
+            parent.remove_child(doc, pos);
         }
+        Ok(())
     }
 }
 
@@ -737,8 +717,8 @@ mod tests {
         assert_eq!(root.children(&doc)[0].as_element().unwrap(), a);
         assert_eq!(a.parent(&doc).unwrap(), root);
 
-        // Element.remove_child_elem
-        root.remove_child_elem(&mut doc, a).unwrap();
+        // Element.remove_child
+        root.remove_child(&mut doc, 0);
         assert_eq!(root.children(&doc).len(), 0);
         assert_eq!(a.parent(&doc), None);
 
@@ -748,13 +728,7 @@ mod tests {
         assert_eq!(root.children(&doc)[0].as_element().unwrap(), a);
         assert_eq!(a.parent(&doc).unwrap(), root);
 
-        // Element.remove_child
-        root.remove_child(&mut doc, 0);
-        assert_eq!(root.children(&doc).len(), 0);
-        assert_eq!(a.parent(&doc), None);
-
         // Element.detatch
-        let a = Element::build(&mut doc, "a").push_to(root);
         a.detatch(&mut doc).unwrap();
         assert_eq!(root.children(&doc).len(), 0);
         assert_eq!(a.parent(&doc), None);
