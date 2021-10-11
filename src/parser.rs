@@ -270,11 +270,13 @@ impl DocumentParser {
                 self.create_element(parent, ev)?;
                 Ok(false)
             }
+            // Comment, CData, and PI content should not be escaped,
+            // but quick-xml assumes only CDATA is not escaped.
             Event::Text(ev) => {
                 if self.read_opts.ignore_whitespace_only && only_has_whitespace(&ev) {
                     return Ok(false);
                 }
-                let content = String::from_utf8(ev.to_vec())?;
+                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
                 let node = Node::Text(content);
                 let parent = *self
                     .element_stack
@@ -299,9 +301,8 @@ impl DocumentParser {
                 parent.push_child(&mut self.doc, node).unwrap();
                 Ok(false)
             }
-            // Comment, CData, and PI content is not escaped.
             Event::Comment(ev) => {
-                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                let content = String::from_utf8(ev.escaped().to_vec())?;
                 let node = Node::Comment(content);
                 let parent = *self
                     .element_stack
@@ -321,7 +322,7 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::PI(ev) => {
-                let content = String::from_utf8(ev.unescaped()?.to_vec())?;
+                let content = String::from_utf8(ev.escaped().to_vec())?;
                 let node = Node::PI(content);
                 let parent = *self
                     .element_stack
