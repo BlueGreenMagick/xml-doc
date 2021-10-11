@@ -3,6 +3,6 @@ Root:
       name: el
   - Text: "Text"
   - Comment: " Comment "
-  - DocType: " doctype"
+  - DocType: "doctype"
   - CData: "<tag>text</tag>"
   - PI: "xml-stylesheet type="text/xsl""

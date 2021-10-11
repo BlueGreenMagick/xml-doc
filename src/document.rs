@@ -287,9 +287,9 @@ impl Document {
                 Node::Text(text) => {
                     writer.write_event(Event::Text(BytesText::from_plain_str(text)))?
                 }
-                Node::DocType(text) => {
-                    writer.write_event(Event::DocType(BytesText::from_plain_str(text)))?
-                }
+                Node::DocType(text) => writer.write_event(Event::DocType(
+                    BytesText::from_plain_str(&format!(" {}", text)), // add a whitespace before text
+                ))?,
                 // Comment, CData, and PI content is not escaped.
                 Node::Comment(text) => {
                     writer.write_event(Event::Comment(BytesText::from_escaped_str(text)))?

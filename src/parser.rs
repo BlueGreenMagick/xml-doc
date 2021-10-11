@@ -284,7 +284,13 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::DocType(ev) => {
-                let content = String::from_utf8(ev.to_vec())?;
+                // Event::DocType comes with one leading whitespace. Strip the whitespace.
+                let raw = ev.unescaped()?;
+                let content = if !raw.is_empty() && raw[0] == b' ' {
+                    String::from_utf8(raw[1..].to_vec())?
+                } else {
+                    String::from_utf8(raw.to_vec())?
+                };
                 let node = Node::DocType(content);
                 let parent = *self
                     .element_stack
