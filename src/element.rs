@@ -101,10 +101,29 @@ impl<'a> ElementBuilder<'a> {
 ///
 /// Note that an element may only interact with elements of the same document,
 /// but the crate doesn't know which document an element is from.
+/// Trying to push an element from a different Document may result in unexpected errors.
 ///
-/// If you for example attempt to call `.remove_child_elem()` with elements from other document,
-/// unexpected errors may occur, or may panic.
-/// You also can't move elements between documents.
+/// # Examples
+///
+/// Find children nodes with attribute
+/// ```
+/// use xml_doc::{Document, Element};
+///
+/// let doc = Document::parse_str(r#"<?xml version="1.0"?>
+/// <data>
+///   <item class="value">a</item>
+///   <item class="value">b</item>
+///   <item></item>
+/// </data>
+/// "#).unwrap();
+///
+/// let data = doc.root_element().unwrap();
+/// let value_items: Vec<Element> = data.children(&doc)
+///     .iter()
+///     .filter_map(|node| node.as_element())
+///     .filter(|elem| elem.attribute(&doc, "class") == Some("value"))
+///     .collect();
+/// ```
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Element {
@@ -298,6 +317,7 @@ impl Element {
         &self.data(doc).attributes
     }
 
+    /// Get attribute value of an element by its full name. (Namespace prefix isn't stripped)
     pub fn attribute<'a>(&self, doc: &'a Document, name: &str) -> Option<&'a str> {
         self.attributes(doc).get(name).map(|v| v.as_str())
     }
@@ -466,7 +486,6 @@ impl Element {
     }
 
     /// Find all direct child element with name `name`.
-    /// If you care about performance, call `self.children().iter().filter()`
     pub fn find_all(&self, doc: &Document, name: &str) -> Vec<Element> {
         self.children(doc)
             .iter()
