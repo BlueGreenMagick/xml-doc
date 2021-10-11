@@ -126,11 +126,15 @@ pub struct ReadOptions {
     /// <tag></tag> will have a Node::Text("") as its children, while <tag /> won't.
     /// Default: `true`
     pub empty_text_node: bool,
-    /// Trims leading and ending whitespaces in Node::Text.
+    /// Trims leading and ending whitespaces in `Node::Text`, and ignore node if it is empty.
     /// Default: `true`
     pub trim_text: bool,
+    /// Ignore Node::Text that only has whitespaces.
+    /// Only makes sense if `trim_text` is `false`. (If both are `true`, performance takes a hit for no gain)
+    /// Default: `false`
+    pub ignore_whitespace_only: bool,
     /// Returns error if document doesn't start with XML declaration.
-    /// If this is set to false, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
+    /// If there is no XML declaration, the parser won't be able to decode encodings other than UTF-8, unless `encoding` below is set.
     /// Default: `true`
     pub require_decl: bool,
     /// If this is set, the parser will start reading with this encoding.
@@ -146,6 +150,7 @@ impl ReadOptions {
         ReadOptions {
             empty_text_node: true,
             trim_text: true,
+            ignore_whitespace_only: false,
             require_decl: true,
             encoding: None,
         }
@@ -269,6 +274,9 @@ impl DocumentParser {
                 Ok(false)
             }
             Event::Text(ev) => {
+                if self.read_opts.ignore_whitespace_only && only_has_whitespace(&ev) {
+                    return Ok(false);
+                }
                 let content = String::from_utf8(ev.to_vec())?;
                 let node = Node::Text(content);
                 let parent = *self
@@ -368,7 +376,22 @@ impl DocumentParser {
         xmlreader.trim_text(self.read_opts.trim_text);
 
         let mut buf = Vec::with_capacity(200);
-        let event = xmlreader.read_event(&mut buf)?;
+
+        // Skip first event if it only has whitespace
+        let event = match xmlreader.read_event(&mut buf)? {
+            Event::Text(ev) => {
+                if ev.len() == 0 {
+                    xmlreader.read_event(&mut buf)?
+                } else if self.read_opts.ignore_whitespace_only && only_has_whitespace(&ev) {
+                    xmlreader.read_event(&mut buf)?
+                } else {
+                    Event::Text(ev)
+                }
+            }
+            ev => ev,
+        };
+        #[cfg(debug_assertions)]
+        debug!(event);
         if let Event::Decl(ev) = event {
             self.handle_decl(&ev)?;
             // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
@@ -403,6 +426,19 @@ impl DocumentParser {
     }
 }
 
+/// Returns true if byte is an XML whitespace character
+fn is_whitespace(byte: u8) -> bool {
+    match byte {
+        b'\r' | b'\n' | b'\t' | b' ' => true,
+        _ => false,
+    }
+}
+
+/// Returns true if bytes.len() == 0 or bytes only has a whitespace-like character.
+fn only_has_whitespace(bytes: &[u8]) -> bool {
+    bytes.iter().all(|b| is_whitespace(*b))
+}
+
 /// #xD(\r), #xA(\n), #x9(\t) is normalized into #x20.
 /// Leading and trailing spaces(#x20) are discarded
 /// and sequence of spaces are replaced by a single space.
@@ -411,18 +447,15 @@ pub fn normalize_space(bytes: &[u8]) -> Vec<u8> {
     let mut char_found = false;
     let mut last_space = false;
     for &byte in bytes {
-        match byte {
-            b'\r' | b'\n' | b'\t' | b' ' => {
-                if char_found && !last_space {
-                    normalized.push(b' ');
-                    last_space = true;
-                }
+        if is_whitespace(byte) {
+            if char_found && !last_space {
+                normalized.push(b' ');
+                last_space = true;
             }
-            val => {
-                char_found = true;
-                last_space = false;
-                normalized.push(val);
-            }
+        } else {
+            char_found = true;
+            last_space = false;
+            normalized.push(byte);
         }
     }
     // There can't be multiple whitespaces

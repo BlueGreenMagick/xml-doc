@@ -131,12 +131,8 @@ where
     let opts = [empty_text_node_opts];
 
     for k in opts.iter().multi_cartesian_product() {
-        let read_options = ReadOptions {
-            empty_text_node: *k[0],
-            trim_text: true,
-            require_decl: true,
-            encoding: None,
-        };
+        let mut read_options = ReadOptions::default();
+        read_options.empty_text_node = *k[0];
         let expected_name: String = expected(&read_options).into();
         let expected = get_expected(&expected_name);
 
