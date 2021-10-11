@@ -238,9 +238,6 @@ impl DocumentParser {
 
     // Returns true if document parsing is finished.
     fn handle_event(&mut self, event: Event) -> Result<bool> {
-        #[cfg(debug_assertions)]
-        debug!(event);
-
         match event {
             Event::Start(ref ev) => {
                 let parent = *self
@@ -419,8 +416,15 @@ impl DocumentParser {
 
         loop {
             let ev = reader.read_event(&mut buf)?;
+            #[cfg(debug_assertions)]
+            debug!(ev);
             if self.handle_event(ev)? {
-                return Ok(());
+                if self.element_stack.len() == 1 {
+                    // Should only have container remaining in element_stack
+                    return Ok(());
+                } else {
+                    return Err(Error::MalformedXML("Closing tag not found.".to_string()));
+                }
             }
         }
     }

@@ -182,25 +182,10 @@ fn encoding2() {
 }
 
 #[test]
-fn error1() {
-    test("error1.xml", |_| "error1.yaml".to_string())
-}
-
-#[test]
-fn error2() {
-    test("error2.xml", |_| "error2.yaml".to_string())
-}
-
-#[test]
 fn nodes() {
     test("nodes.xml", |_| "nodes.yaml".to_string())
 }
 #[test]
 fn namespace() {
     test("namespace.xml", |_| "namespace.yaml".to_string())
-}
-
-#[test]
-fn standalone() {
-    test("standalone.xml", |_| "standalone_err.yaml".to_string())
 }
