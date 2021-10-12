@@ -1,6 +1,6 @@
 [package]
 name = "xml-doc"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Yoonchae Lee <bluegreenmagick@gmail.com>"]
 description = "Read, modify and write xml in tree-like structure. Supports UTF-16."
 edition = "2018"

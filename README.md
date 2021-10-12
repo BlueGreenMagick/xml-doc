@@ -52,10 +52,10 @@ To run benchmark: `cd benches ; cargo bench`.
 
 ```
                   tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16)
-xml_doc v0.1.1:     88.40us     32.06ms      370.38ms      33.40ms
-minidom v0.12.0:   104.70us     48.80ms      682.06ms
-roxmltree v0.14.1:  53.00us     17.40ms      359.34ms
-xmltree v0.10.3:  4341.9 us   1352.2 ms    22863. ms
+xml_doc v0.2.0:     73.79us     29.74ms      341.05ms      29.16ms
+minidom v0.12.0:    85.19us     40.09ms      565.04ms
+roxmltree v0.14.1:  49.34us     16.33ms      330.90ms
+xmltree v0.10.3:  4065.8 us   1204.7 ms    21198.  ms
 ```
 
 Only roxmltree which doesn't support writing, is considerably faster than xml_doc. You can see the result of the benchmarks [here](https://github.com/BlueGreenMagick/xml-doc/runs/3845335396).
