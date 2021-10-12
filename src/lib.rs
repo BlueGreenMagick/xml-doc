@@ -60,7 +60,6 @@
 //! doc.write_file(&xml_file);
 //! ```
 //!
-
 mod document;
 mod element;
 mod error;

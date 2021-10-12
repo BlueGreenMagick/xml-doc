@@ -85,6 +85,7 @@ impl<'a> ElementBuilder<'a> {
         self.element
     }
 
+    /// Push this element to the parent's children.
     pub fn push_to(self, parent: Element) -> Element {
         self.element.push_to(self.doc, parent).unwrap();
         self.element
@@ -501,17 +502,13 @@ impl Element {
 /// an element's parent and children is not directly exposed for modification.
 /// But in return, it is not possible for a document to be in an inconsistant state,
 /// where an element's parent doesn't have the element as its children.
-///
-/// # Errors
-///
-/// These errors are shared by below methods.
-///
-/// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
-/// call `element.detatch()` to make it parentless first.
-/// This is to make it explicit that you are changing an element's parent, not adding another.
-/// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
 impl Element {
     /// Equivalent to `vec.push()`.
+    /// # Errors
+    /// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
+    /// call `element.detatch()` to make it parentless first.
+    /// This is to make it explicit that you are changing an element's parent, not adding another.
+    /// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
     pub fn push_child(&self, doc: &mut Document, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {
@@ -528,6 +525,12 @@ impl Element {
     }
 
     /// Equivalent to `parent.push_child()`.
+    ///
+    /// # Errors
+    /// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
+    /// call `element.detatch()` to make it parentless first.
+    /// This is to make it explicit that you are changing an element's parent, not adding another.
+    /// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
     pub fn push_to(&self, doc: &mut Document, parent: Element) -> Result<()> {
         parent.push_child(doc, self.as_node())
     }
@@ -537,6 +540,12 @@ impl Element {
     /// # Panics
     ///
     /// Panics if `index > self.children().len()`
+    ///
+    /// # Errors
+    /// - [`Error::HasAParent`]: When you want to replace an element's parent with another,
+    /// call `element.detatch()` to make it parentless first.
+    /// This is to make it explicit that you are changing an element's parent, not adding another.
+    /// - [`Error::ContainerCannotMove`]: The container element's parent must always be None.
     pub fn insert_child(&self, doc: &mut Document, index: usize, node: Node) -> Result<()> {
         if let Node::Element(elem) = node {
             if elem.is_container() {
@@ -565,6 +574,7 @@ impl Element {
         node
     }
 
+    /// Equivalent to `vec.pop()`.
     pub fn pop_child(&self, doc: &mut Document) -> Option<Node> {
         let child = self.mut_data(doc).children.pop();
         if let Some(Node::Element(elem)) = &child {
@@ -573,11 +583,15 @@ impl Element {
         child
     }
 
-    /// Remove all children
-    pub fn clear_children(&self, doc: &mut Document) {
-        for _ in 0..self.children(doc).len() {
-            self.remove_child(doc, 0);
+    /// Remove all children and return them.
+    pub fn clear_children(&self, doc: &mut Document) -> Vec<Node> {
+        let count = self.children(doc).len();
+        let mut removed = Vec::with_capacity(count);
+        for _ in 0..count {
+            let child = self.remove_child(doc, 0);
+            removed.push(child);
         }
+        removed
     }
 
     /// Removes itself from its parent. Note that you can't attach this element to other documents.

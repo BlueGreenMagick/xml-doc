@@ -208,15 +208,12 @@ impl Document {
 }
 
 /// Options when writing XML.
-///
-/// indent_char: b' ' - byte character to indent with
-///
-/// indent_size: 2 - how many indent_char should be used for indent
-///
-/// write_decl: true - XML declaration should be written at the top
 pub struct WriteOptions {
+    /// Byte character to indent with. (default: `b' '`)
     pub indent_char: u8,
+    /// How many indent_char should be used for indent. (default: 2)
     pub indent_size: usize,
+    /// XML declaration should be written at the top. (default: `true`)
     pub write_decl: bool,
 }
 
