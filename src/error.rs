@@ -23,6 +23,30 @@ pub enum Error {
     HasAParent,
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Io(err) => write!(f, "IO Error: {}", err),
+            Error::CannotDecode => write!(f, "Cannot decode XML"),
+            Error::MalformedXML(err) => write!(f, "Malformed XML: {}", err),
+            Error::ContainerCannotMove => write!(f, "Container element cannot move"),
+            Error::HasAParent => write!(
+                f,
+                "Element already has a parent. Call detatch() before changing parent."
+            ),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Io(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
 impl From<XMLError> for Error {
     fn from(err: XMLError) -> Error {
         match err {
@@ -32,7 +56,7 @@ impl From<XMLError> for Error {
             )),
             XMLError::Io(err) => Error::Io(err),
             XMLError::Utf8(_) => Error::CannotDecode,
-            err => Error::MalformedXML(format!("{:?}", err)),
+            err => Error::MalformedXML(err.to_string()),
         }
     }
 }
