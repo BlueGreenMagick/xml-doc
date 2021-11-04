@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs::File;
 use std::path::Path;
 
@@ -12,7 +12,8 @@ macro_rules! bench {
 }
 
 fn xmldoc_parse(path: &Path) {
-    xml_doc::Document::parse_file(path).unwrap();
+    let doc = xml_doc::Document::parse_file(path).unwrap();
+    black_box(doc);
 }
 bench!("tiny.xml", tiny_xmldoc, xmldoc_parse);
 bench!("medium.xml", medium_xmldoc, xmldoc_parse);
@@ -21,7 +22,8 @@ bench!("medium_utf16.xml", utf16_xmldoc, xmldoc_parse);
 
 fn minidom_parse(path: &Path) {
     let mut reader = minidom::quick_xml::Reader::from_file(path).unwrap();
-    minidom::Element::from_reader(&mut reader).unwrap();
+    let doc = minidom::Element::from_reader(&mut reader).unwrap();
+    black_box(doc);
 }
 bench!("tiny.xml", tiny_minidom, minidom_parse);
 bench!("medium.xml", medium_minidom, minidom_parse);
@@ -30,7 +32,8 @@ bench!("large.xml", large_minidom, minidom_parse);
 fn roxmltree_parse<'a>(path: &Path) {
     // roxmltree doesn't implement reading from reader.
     let xml = std::fs::read_to_string(path).unwrap();
-    roxmltree::Document::parse(xml.as_ref()).unwrap();
+    let doc = roxmltree::Document::parse(xml.as_ref()).unwrap();
+    black_box(doc);
 }
 bench!("tiny.xml", tiny_roxmltree, roxmltree_parse);
 bench!("medium.xml", medium_roxmltree, roxmltree_parse);
@@ -38,7 +41,8 @@ bench!("large.xml", large_roxmltree, roxmltree_parse);
 
 fn xmltree_parse(path: &Path) {
     let file = File::open(path).unwrap();
-    xmltree::Element::parse(file).unwrap();
+    let doc = xmltree::Element::parse(file).unwrap();
+    black_box(doc);
 }
 bench!("tiny.xml", tiny_xmltree, xmltree_parse);
 bench!("medium.xml", medium_xmltree, xmltree_parse);
