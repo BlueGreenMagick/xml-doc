@@ -23,9 +23,9 @@
 //! let metadata = doc.root_element().unwrap();
 //!
 //! // Add a new element
-//! let series = Element::build(&mut doc, "series")
+//! let series = Element::build("series")
 //!     .text_content("Lord of the Rings")
-//!     .push_to(metadata);
+//!     .push_to(&mut doc, metadata);
 //!
 //! // Modify existing element
 //! let date = metadata.find(&doc, "date").unwrap();

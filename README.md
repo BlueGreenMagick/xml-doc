@@ -36,10 +36,10 @@ let title = metadata.find(&doc, "title").unwrap();
 title.set_attribute("xml:lang", "en");
 
 // Add an element to metadata: <dc:creator id="author">Yoonchae Lee</dc:creator>
-let author = Element::build(&mut doc, "dc:creator")
+let author = Element::build("dc:creator")
     .text_content("Yoonchae Lee")
     .attribute("id", "author")
-    .push_to(metadata);
+    .push_to(&mut doc, metadata);
 
 let new_xml = doc.write_str();
 ```

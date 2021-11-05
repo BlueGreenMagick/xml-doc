@@ -221,7 +221,6 @@ impl DocumentParser {
             }
             attributes.insert(key, value);
         }
-
         let elem = Element::with_data(&mut self.doc, full_name, attributes, namespace_decls);
         parent
             .push_child(&mut self.doc, Node::Element(elem))

@@ -25,15 +25,15 @@ pub(crate) struct ElementData {
 ///
 /// let mut doc = Document::new();
 ///
-/// let root = Element::build(&mut doc, "root")
+/// let root = Element::build("root")
 ///     .attribute("id", "main")
 ///     .attribute("class", "main")
-///     .finish();
+///     .finish(&mut doc);
 /// doc.push_root_node(root.as_node());
 ///
-/// let name = Element::build(&mut doc, "name")
+/// let name = Element::build("name")
 ///     .text_content("No Name")
-///     .push_to(root);
+///     .push_to(&mut doc, root);
 ///
 /// /* Equivalent xml:
 ///   <root id="main" class="main">
@@ -42,53 +42,71 @@ pub(crate) struct ElementData {
 /// */
 /// ```
 ///
-pub struct ElementBuilder<'a> {
-    element: Element,
-    doc: &'a mut Document,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElementBuilder {
+    full_name: String,
+    attributes: HashMap<String, String>,
+    namespace_decls: HashMap<String, String>,
+    text_content: Option<String>,
 }
 
-impl<'a> ElementBuilder<'a> {
-    fn new(element: Element, doc: &'a mut Document) -> ElementBuilder<'a> {
-        ElementBuilder { element, doc }
+impl ElementBuilder {
+    fn new(full_name: String) -> ElementBuilder {
+        ElementBuilder {
+            full_name: full_name,
+            attributes: HashMap::new(),
+            namespace_decls: HashMap::new(),
+            text_content: None,
+        }
     }
 
     /// Removes previous prefix if it exists, and attach new prefix.
-    pub fn prefix<S: Into<String>>(self, prefix: S) -> Self {
-        self.element.set_prefix(self.doc, prefix);
+    pub fn prefix(mut self, prefix: &str) -> Self {
+        let (_, name) = Element::separate_prefix_name(&self.full_name);
+        if prefix.is_empty() {
+            self.full_name = name.to_string();
+        } else {
+            self.full_name = format!("{}{}", prefix, name);
+        }
         self
     }
 
-    pub fn attribute<S, T>(self, name: S, value: T) -> Self
+    pub fn attribute<S, T>(mut self, name: S, value: T) -> Self
     where
         S: Into<String>,
         T: Into<String>,
     {
-        self.element.set_attribute(self.doc, name, value);
+        self.attributes.insert(name.into(), value.into());
         self
     }
 
-    pub fn namespace_decl<S, T>(self, prefix: S, namespace: T) -> Self
+    pub fn namespace_decl<S, T>(mut self, prefix: S, namespace: T) -> Self
     where
         S: Into<String>,
         T: Into<String>,
     {
-        self.element.set_namespace_decl(self.doc, prefix, namespace);
+        self.namespace_decls.insert(prefix.into(), namespace.into());
         self
     }
 
-    pub fn text_content<S: Into<String>>(self, text: S) -> Self {
-        self.element.set_text_content(self.doc, text);
+    pub fn text_content<S: Into<String>>(mut self, text: S) -> Self {
+        self.text_content = Some(text.into());
         self
     }
 
-    pub fn finish(self) -> Element {
-        self.element
+    pub fn finish(self, doc: &mut Document) -> Element {
+        let elem = Element::with_data(doc, self.full_name, self.attributes, self.namespace_decls);
+        if let Some(text) = self.text_content {
+            elem.push_child(doc, Node::Text(text)).unwrap();
+        }
+        elem
     }
 
     /// Push this element to the parent's children.
-    pub fn push_to(self, parent: Element) -> Element {
-        self.element.push_to(self.doc, parent).unwrap();
-        self.element
+    pub fn push_to(self, doc: &mut Document, parent: Element) -> Element {
+        let elem = self.finish(doc);
+        elem.push_to(doc, parent).unwrap();
+        elem
     }
 }
 
@@ -149,16 +167,15 @@ impl Element {
     ///
     /// let mut doc = Document::new();
     ///
-    /// let elem = Element::build(&mut doc, "root")
+    /// let elem = Element::build("root")
     ///     .attribute("id", "main")
     ///     .attribute("class", "main")
-    ///     .finish();
+    ///     .finish(&mut doc);
     ///
     /// doc.push_root_node(elem.as_node());
     /// ```
-    pub fn build<S: Into<String>>(doc: &mut Document, name: S) -> ElementBuilder {
-        let element = Self::new(doc, name);
-        ElementBuilder::new(element, doc)
+    pub fn build<S: Into<String>>(name: S) -> ElementBuilder {
+        ElementBuilder::new(name.into())
     }
 
     pub(crate) fn with_data(
@@ -303,10 +320,10 @@ impl Element {
     /// use xml_doc::{Document, Element};
     ///
     /// let mut doc = Document::new();
-    /// let element = Element::build(&mut doc, "name")
+    /// let element = Element::build("name")
     ///     .attribute("id", "name")
     ///     .attribute("pre:name", "value")
-    ///     .finish();
+    ///     .finish(&mut doc);
     ///
     /// let attrs = element.attributes(&doc);
     /// for (full_name, value) in attrs {
@@ -725,7 +742,7 @@ mod tests {
         assert_eq!(container.children(&doc).len(), 0);
 
         // Element::build.push_to
-        let root = Element::build(&mut doc, "root").push_to(container);
+        let root = Element::build("root").push_to(&mut doc, container);
         assert_eq!(root.parent(&doc).unwrap(), container);
         assert_eq!(doc.root_element().unwrap(), root);
 

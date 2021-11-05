@@ -10,13 +10,13 @@ fn test_escape() {
 <?<&amp;?>"#;
     let mut doc = Document::new();
     let container = doc.container();
-    let root = Element::build(&mut doc, "root")
+    let root = Element::build("root")
         .attribute("attr", "><&\"'attrval")
-        .push_to(container);
-    Element::build(&mut doc, "inner")
+        .push_to(&mut doc, container);
+    Element::build("inner")
         .namespace_decl("ns", "><&\"'nsval")
         .text_content("><&\"'text")
-        .push_to(root);
+        .push_to(&mut doc, root);
     doc.push_root_node(Node::Comment("<&amp;".to_string()))
         .unwrap();
     doc.push_root_node(Node::CData("<&amp;".to_string()))
