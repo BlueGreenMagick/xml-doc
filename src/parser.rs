@@ -9,13 +9,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
 
-#[cfg(debug_assertions)]
-macro_rules! debug {
-    ($x:expr) => {
-        println!("{:?}", $x)
-    };
-}
-
 pub(crate) struct DecodeReader<R: Read> {
     decoder: Option<Decoder>,
     inner: R,
@@ -398,8 +391,7 @@ impl DocumentParser {
             }
             ev => ev,
         };
-        #[cfg(debug_assertions)]
-        debug!(event);
+
         if let Event::Decl(ev) = event {
             self.handle_decl(&ev)?;
             // Encoding::for_label("UTF-16") defaults to UTF-16 LE, even though it could be UTF-16 BE
@@ -427,8 +419,7 @@ impl DocumentParser {
 
         loop {
             let ev = reader.read_event(&mut buf)?;
-            #[cfg(debug_assertions)]
-            debug!(ev);
+
             if self.handle_event(ev)? {
                 if self.element_stack.len() == 1 {
                     // Should only have container remaining in element_stack
