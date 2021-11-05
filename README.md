@@ -48,14 +48,26 @@ let new_xml = doc.write_str();
 
 To run benchmark: `cd benches ; cargo bench`.
 
-### Parsing
+### Tree-based Parser
 
 ```
-                  tiny(4.8KB) medium(1.5MB) large(25MB) medium(UTF-16)
-xml_doc v0.2.0:     73.79us     29.74ms      341.05ms      29.16ms
-minidom v0.12.0:    85.19us     40.09ms      565.04ms
-roxmltree v0.14.1:  49.34us     16.33ms      330.90ms
-xmltree v0.10.3:  4065.8 us   1204.7 ms    21198.  ms
+                   tiny(5KB) medium(1.5MB) large(25MB) medium(UTF-16)
+xml-doc v0.2.0:     81.02us     31.08ms      355.04ms      33.33ms
+minidom v0.12.0:    94.93us     43.39ms      610.41ms
+roxmltree v0.14.1:  52.73us     17.23ms      353.79ms
+xmltree v0.10.3:  4305.7 us   1355.0 ms    22769.  ms
 ```
 
-Only roxmltree which doesn't support writing, is considerably faster than xml_doc. You can see the result of the benchmarks [here](https://github.com/BlueGreenMagick/xml-doc/runs/3845335396).
+Only roxmltree which doesn't support writing, is considerably faster than xml_doc. [(Benchmark results)](https://github.com/BlueGreenMagick/xml-doc/runs/4106349292).
+
+### Event-based parser
+
+This crate uses [quick-xml] to parse/write xml, which seems to be the fastest xml event parser. [(Benchmark results)](https://github.com/BlueGreenMagick/xml-doc/runs/4106349292).
+
+```
+                   tiny(5KB) medium(1.5MB) large(25MB)
+quick-xml v0.17.2:  21.11us     6.63ms       97.79ms
+xml-rs v0.8.4:     343.56us    96.17ms     1671.8 ms
+xml5ever v0.16.2:  127.83us    42.46ms      550.83ms
+RustyXML v0.3.0:   103.07us    36.40ms      710.93ms
+```
